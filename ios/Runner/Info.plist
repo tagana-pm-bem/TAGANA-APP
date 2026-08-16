@@ -45,5 +45,10 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Bluetooth permissions for device connection -->
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Aplikasi memerlukan akses Bluetooth untuk terhubung ke perangkat TAGANA.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Aplikasi memerlukan akses Bluetooth untuk terhubung ke perangkat TAGANA.</string>
 </dict>
 </plist>

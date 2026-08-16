@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tagana_app/core/theme/app_colors.dart';
+import 'package:go_router/go_router.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -27,7 +28,8 @@ class _RegisterWhatsAppPageState extends State<RegisterPage> {
 
   void _onSubmit() {
     if (!_canSubmit) return;
-    // TODO: kirim OTP ke nomor WhatsApp lalu navigate ke halaman verifikasi OTP
+    // Navigate to enter device page
+    context.go('/enter-device');
   }
 
   @override
@@ -171,7 +173,11 @@ class _RegisterWhatsAppPageState extends State<RegisterPage> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             children: [
-              Icon(Icons.person_outline, size: 17, color: AppColors.mutedForeground),
+              Icon(
+                Icons.person_outline,
+                size: 17,
+                color: AppColors.mutedForeground,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: TextField(
@@ -236,7 +242,11 @@ class _RegisterWhatsAppPageState extends State<RegisterPage> {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  Icon(Icons.keyboard_arrow_down, size: 16, color: AppColors.mutedForeground),
+                  Icon(
+                    Icons.keyboard_arrow_down,
+                    size: 16,
+                    color: AppColors.mutedForeground,
+                  ),
                 ],
               ),
             ),
@@ -266,7 +276,9 @@ class _RegisterWhatsAppPageState extends State<RegisterPage> {
                         ),
                         decoration: InputDecoration(
                           hintText: '812-3456-7890',
-                          hintStyle: TextStyle(color: AppColors.mutedForeground),
+                          hintStyle: TextStyle(
+                            color: AppColors.mutedForeground,
+                          ),
                           filled: false,
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
@@ -275,7 +287,9 @@ class _RegisterWhatsAppPageState extends State<RegisterPage> {
                           errorBorder: InputBorder.none,
                           focusedErrorBorder: InputBorder.none,
                           isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                          ),
                         ),
                       ),
                     ),
@@ -287,7 +301,11 @@ class _RegisterWhatsAppPageState extends State<RegisterPage> {
                           color: AppColors.success,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.check, size: 11, color: Colors.white),
+                        child: const Icon(
+                          Icons.check,
+                          size: 11,
+                          color: Colors.white,
+                        ),
                       ),
                   ],
                 ),
