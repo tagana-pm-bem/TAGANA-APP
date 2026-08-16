@@ -8,6 +8,7 @@ abstract final class AppColors {
   // Base
   static const background = Color(0xFFFAFAFA);
   static const foreground = Color(0xFF0A0A0A);
+  static const secondary = Color.fromARGB(255, 237, 237, 237);
 
   // Surface
   static const card = Color(0xFFFFFFFF);
@@ -31,4 +32,6 @@ abstract final class AppColors {
 
   static const destructive = Color(0xFFDC2626);
   static const destructiveForeground = Color(0xFFFFFFFF);
+
+  static const navyLight = Color(0xFFe8eef7);
 }
