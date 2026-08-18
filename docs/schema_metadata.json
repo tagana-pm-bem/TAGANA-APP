@@ -1,1645 +1,1644 @@
 {
-    "project": "TAGANA-APP",
-    "database": {
-        "engine": "PostgreSQL",
-        "schemas": {
-            "public": {
-                "enums": {
-                    "alert_type": {
-                        "schema": "public",
-                        "values": [
-                            "high_water_level",
-                            "flood_detected",
-                            "low_battery",
-                            "device_offline",
-                            "connection_lost"
-                        ]
-                    },
-                    "alert_status": {
-                        "schema": "public",
-                        "values": [
-                            "active",
-                            "resolved"
-                        ]
-                    },
-                    "alert_severity": {
-                        "schema": "public",
-                        "values": [
-                            "info",
-                            "warning",
-                            "critical"
-                        ]
-                    },
-                    "device_member_role": {
-                        "schema": "public",
-                        "values": [
-                            "owner",
-                            "member"
-                        ]
-                    },
-                    "device_activity_type": {
-                        "schema": "public",
-                        "values": [
-                            "device_registered",
-                            "device_connected",
-                            "device_disconnected",
-                            "ble_connected",
-                            "ble_disconnected",
-                            "wifi_configured",
-                            "wifi_connected",
-                            "wifi_disconnected",
-                            "data_sync",
-                            "firmware_updated",
-                            "network_reset",
-                            "emergency_mode"
-                        ]
-                    }
-                },
-                "tables": {
-                    "alerts": {
-                        "rls": {
-                            "forced": false,
-                            "enabled": true
-                        },
-                        "columns": [
-                            {
-                                "name": "id",
-                                "comment": null,
-                                "default": "gen_random_uuid()",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 1,
-                                "udt_name": "uuid",
-                                "data_type": "uuid",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "device_id",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 2,
-                                "udt_name": "uuid",
-                                "data_type": "uuid",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "type",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 3,
-                                "udt_name": "alert_type",
-                                "data_type": "alert_type",
-                                "generated": null,
-                                "udt_schema": "public"
-                            },
-                            {
-                                "name": "severity",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 4,
-                                "udt_name": "alert_severity",
-                                "data_type": "alert_severity",
-                                "generated": null,
-                                "udt_schema": "public"
-                            },
-                            {
-                                "name": "status",
-                                "comment": null,
-                                "default": "'active'::alert_status",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 5,
-                                "udt_name": "alert_status",
-                                "data_type": "alert_status",
-                                "generated": null,
-                                "udt_schema": "public"
-                            },
-                            {
-                                "name": "value",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 6,
-                                "udt_name": "numeric",
-                                "data_type": "numeric",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "threshold",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 7,
-                                "udt_name": "numeric",
-                                "data_type": "numeric",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "message",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 8,
-                                "udt_name": "text",
-                                "data_type": "text",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "triggered_at",
-                                "comment": null,
-                                "default": "now()",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 9,
-                                "udt_name": "timestamptz",
-                                "data_type": "timestamp with time zone",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "resolved_at",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 10,
-                                "udt_name": "timestamptz",
-                                "data_type": "timestamp with time zone",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            }
-                        ],
-                        "indexes": [
-                            {
-                                "name": "alerts_active_idx",
-                                "valid": true,
-                                "unique": false,
-                                "columns": [
-                                    "device_id",
-                                    "status"
-                                ],
-                                "primary": false,
-                                "definition": "CREATE INDEX alerts_active_idx ON public.alerts USING btree (device_id, status) WHERE (status = 'active'::alert_status)"
-                            },
-                            {
-                                "name": "alerts_device_triggered_idx",
-                                "valid": true,
-                                "unique": false,
-                                "columns": [
-                                    "device_id",
-                                    "triggered_at"
-                                ],
-                                "primary": false,
-                                "definition": "CREATE INDEX alerts_device_triggered_idx ON public.alerts USING btree (device_id, triggered_at DESC)"
-                            },
-                            {
-                                "name": "alerts_pkey",
-                                "valid": true,
-                                "unique": true,
-                                "columns": [
-                                    "id"
-                                ],
-                                "primary": true,
-                                "definition": "CREATE UNIQUE INDEX alerts_pkey ON public.alerts USING btree (id)"
-                            }
-                        ],
-                        "triggers": [
-                        ],
-                        "description": "Alerts generated from device conditions.",
-                        "primary_key": {
-                            "name": "alerts_pkey",
-                            "columns": [
-                                "id"
-                            ]
-                        },
-                        "foreign_keys": [
-                            {
-                                "name": "alerts_device_id_fkey",
-                                "columns": [
-                                    "device_id"
-                                ],
-                                "on_delete": "CASCADE",
-                                "on_update": "NO ACTION",
-                                "references": {
-                                    "table": "devices",
-                                    "schema": "public",
-                                    "columns": [
-                                        "id"
-                                    ]
-                                }
-                            }
-                        ],
-                        "rls_policies": [
-                        ],
-                        "check_constraints": [
-                        ],
-                        "unique_constraints": [
-                        ]
-                    },
-                    "devices": {
-                        "rls": {
-                            "forced": false,
-                            "enabled": true
-                        },
-                        "columns": [
-                            {
-                                "name": "id",
-                                "comment": null,
-                                "default": "gen_random_uuid()",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 1,
-                                "udt_name": "uuid",
-                                "data_type": "uuid",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "device_code",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 2,
-                                "udt_name": "text",
-                                "data_type": "text",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "serial_number",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 3,
-                                "udt_name": "text",
-                                "data_type": "text",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "hardware_version",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 4,
-                                "udt_name": "text",
-                                "data_type": "text",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "firmware_version",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 5,
-                                "udt_name": "text",
-                                "data_type": "text",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "installed_at",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 6,
-                                "udt_name": "timestamptz",
-                                "data_type": "timestamp with time zone",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "is_active",
-                                "comment": null,
-                                "default": "true",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 7,
-                                "udt_name": "bool",
-                                "data_type": "boolean",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "created_at",
-                                "comment": null,
-                                "default": "now()",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 8,
-                                "udt_name": "timestamptz",
-                                "data_type": "timestamp with time zone",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "updated_at",
-                                "comment": null,
-                                "default": "now()",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 9,
-                                "udt_name": "timestamptz",
-                                "data_type": "timestamp with time zone",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            }
-                        ],
-                        "indexes": [
-                            {
-                                "name": "devices_device_code_unique_idx",
-                                "valid": true,
-                                "unique": true,
-                                "columns": [
-                                    "device_code"
-                                ],
-                                "primary": false,
-                                "definition": "CREATE UNIQUE INDEX devices_device_code_unique_idx ON public.devices USING btree (device_code)"
-                            },
-                            {
-                                "name": "devices_pkey",
-                                "valid": true,
-                                "unique": true,
-                                "columns": [
-                                    "id"
-                                ],
-                                "primary": true,
-                                "definition": "CREATE UNIQUE INDEX devices_pkey ON public.devices USING btree (id)"
-                            },
-                            {
-                                "name": "devices_serial_number_unique_idx",
-                                "valid": true,
-                                "unique": true,
-                                "columns": [
-                                    "serial_number"
-                                ],
-                                "primary": false,
-                                "definition": "CREATE UNIQUE INDEX devices_serial_number_unique_idx ON public.devices USING btree (serial_number) WHERE (serial_number IS NOT NULL)"
-                            }
-                        ],
-                        "triggers": [
-                            {
-                                "name": "devices_updated_at",
-                                "events": "CREATE TRIGGER devices_updated_at BEFORE UPDATE ON public.devices FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
-                                "enabled": "ENABLED",
-                                "function": "set_updated_at"
-                            }
-                        ],
-                        "description": "Registered TAGANA ESP32 devices.",
-                        "primary_key": {
-                            "name": "devices_pkey",
-                            "columns": [
-                                "id"
-                            ]
-                        },
-                        "foreign_keys": [
-                        ],
-                        "rls_policies": [
-                        ],
-                        "check_constraints": [
-                            {
-                                "name": "devices_device_code_format_chk",
-                                "definition": "CHECK ((device_code ~ '^TGN_[A-Z0-9]+$'::text))"
-                            }
-                        ],
-                        "unique_constraints": [
-                        ]
-                    },
-                    "user_devices": {
-                        "rls": {
-                            "forced": false,
-                            "enabled": true
-                        },
-                        "columns": [
-                            {
-                                "name": "id",
-                                "comment": null,
-                                "default": "gen_random_uuid()",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 1,
-                                "udt_name": "uuid",
-                                "data_type": "uuid",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "user_id",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 2,
-                                "udt_name": "uuid",
-                                "data_type": "uuid",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "device_id",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 3,
-                                "udt_name": "uuid",
-                                "data_type": "uuid",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "role",
-                                "comment": null,
-                                "default": "'member'::device_member_role",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 4,
-                                "udt_name": "device_member_role",
-                                "data_type": "device_member_role",
-                                "generated": null,
-                                "udt_schema": "public"
-                            },
-                            {
-                                "name": "created_at",
-                                "comment": null,
-                                "default": "now()",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 5,
-                                "udt_name": "timestamptz",
-                                "data_type": "timestamp with time zone",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "updated_at",
-                                "comment": null,
-                                "default": "now()",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 6,
-                                "udt_name": "timestamptz",
-                                "data_type": "timestamp with time zone",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            }
-                        ],
-                        "indexes": [
-                            {
-                                "name": "user_devices_device_id_idx",
-                                "valid": true,
-                                "unique": false,
-                                "columns": [
-                                    "device_id"
-                                ],
-                                "primary": false,
-                                "definition": "CREATE INDEX user_devices_device_id_idx ON public.user_devices USING btree (device_id)"
-                            },
-                            {
-                                "name": "user_devices_pkey",
-                                "valid": true,
-                                "unique": true,
-                                "columns": [
-                                    "id"
-                                ],
-                                "primary": true,
-                                "definition": "CREATE UNIQUE INDEX user_devices_pkey ON public.user_devices USING btree (id)"
-                            },
-                            {
-                                "name": "user_devices_unique_user_device",
-                                "valid": true,
-                                "unique": true,
-                                "columns": [
-                                    "user_id",
-                                    "device_id"
-                                ],
-                                "primary": false,
-                                "definition": "CREATE UNIQUE INDEX user_devices_unique_user_device ON public.user_devices USING btree (user_id, device_id)"
-                            },
-                            {
-                                "name": "user_devices_user_id_idx",
-                                "valid": true,
-                                "unique": false,
-                                "columns": [
-                                    "user_id"
-                                ],
-                                "primary": false,
-                                "definition": "CREATE INDEX user_devices_user_id_idx ON public.user_devices USING btree (user_id)"
-                            }
-                        ],
-                        "triggers": [
-                            {
-                                "name": "user_devices_updated_at",
-                                "events": "CREATE TRIGGER user_devices_updated_at BEFORE UPDATE ON public.user_devices FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
-                                "enabled": "ENABLED",
-                                "function": "set_updated_at"
-                            }
-                        ],
-                        "description": "Many-to-many relationship between users and TAGANA devices.",
-                        "primary_key": {
-                            "name": "user_devices_pkey",
-                            "columns": [
-                                "id"
-                            ]
-                        },
-                        "foreign_keys": [
-                            {
-                                "name": "user_devices_device_id_fkey",
-                                "columns": [
-                                    "device_id"
-                                ],
-                                "on_delete": "CASCADE",
-                                "on_update": "NO ACTION",
-                                "references": {
-                                    "table": "devices",
-                                    "schema": "public",
-                                    "columns": [
-                                        "id"
-                                    ]
-                                }
-                            },
-                            {
-                                "name": "user_devices_user_id_fkey",
-                                "columns": [
-                                    "user_id"
-                                ],
-                                "on_delete": "CASCADE",
-                                "on_update": "NO ACTION",
-                                "references": {
-                                    "table": "users",
-                                    "schema": "auth",
-                                    "columns": [
-                                        "id"
-                                    ]
-                                }
-                            }
-                        ],
-                        "rls_policies": [
-                        ],
-                        "check_constraints": [
-                        ],
-                        "unique_constraints": [
-                            {
-                                "name": "user_devices_unique_user_device",
-                                "columns": [
-                                    "user_id",
-                                    "device_id"
-                                ]
-                            }
-                        ]
-                    },
-                    "device_status": {
-                        "rls": {
-                            "forced": false,
-                            "enabled": true
-                        },
-                        "columns": [
-                            {
-                                "name": "device_id",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 1,
-                                "udt_name": "uuid",
-                                "data_type": "uuid",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "water_level",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 2,
-                                "udt_name": "numeric",
-                                "data_type": "numeric(8,3)",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "is_flood_detected",
-                                "comment": null,
-                                "default": "false",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 3,
-                                "udt_name": "bool",
-                                "data_type": "boolean",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "battery_level",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 4,
-                                "udt_name": "numeric",
-                                "data_type": "numeric(5,2)",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "signal_strength",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 5,
-                                "udt_name": "int4",
-                                "data_type": "integer",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "latitude",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 6,
-                                "udt_name": "numeric",
-                                "data_type": "numeric(10,7)",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "longitude",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 7,
-                                "udt_name": "numeric",
-                                "data_type": "numeric(10,7)",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "location_accuracy",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 8,
-                                "udt_name": "numeric",
-                                "data_type": "numeric(8,2)",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "is_online",
-                                "comment": null,
-                                "default": "false",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 9,
-                                "udt_name": "bool",
-                                "data_type": "boolean",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "last_seen_at",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 10,
-                                "udt_name": "timestamptz",
-                                "data_type": "timestamp with time zone",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "updated_at",
-                                "comment": null,
-                                "default": "now()",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 11,
-                                "udt_name": "timestamptz",
-                                "data_type": "timestamp with time zone",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            }
-                        ],
-                        "indexes": [
-                            {
-                                "name": "device_status_pkey",
-                                "valid": true,
-                                "unique": true,
-                                "columns": [
-                                    "device_id"
-                                ],
-                                "primary": true,
-                                "definition": "CREATE UNIQUE INDEX device_status_pkey ON public.device_status USING btree (device_id)"
-                            }
-                        ],
-                        "triggers": [
-                        ],
-                        "description": "Latest device telemetry/state used for realtime monitoring.",
-                        "primary_key": {
-                            "name": "device_status_pkey",
-                            "columns": [
-                                "device_id"
-                            ]
-                        },
-                        "foreign_keys": [
-                            {
-                                "name": "device_status_device_id_fkey",
-                                "columns": [
-                                    "device_id"
-                                ],
-                                "on_delete": "CASCADE",
-                                "on_update": "NO ACTION",
-                                "references": {
-                                    "table": "devices",
-                                    "schema": "public",
-                                    "columns": [
-                                        "id"
-                                    ]
-                                }
-                            }
-                        ],
-                        "rls_policies": [
-                        ],
-                        "check_constraints": [
-                            {
-                                "name": "device_status_battery_chk",
-                                "definition": "CHECK (((battery_level IS NULL) OR ((battery_level >= (0)::numeric) AND (battery_level <= (100)::numeric))))"
-                            },
-                            {
-                                "name": "device_status_latitude_chk",
-                                "definition": "CHECK (((latitude IS NULL) OR ((latitude >= ('-90'::integer)::numeric) AND (latitude <= (90)::numeric))))"
-                            },
-                            {
-                                "name": "device_status_longitude_chk",
-                                "definition": "CHECK (((longitude IS NULL) OR ((longitude >= ('-180'::integer)::numeric) AND (longitude <= (180)::numeric))))"
-                            },
-                            {
-                                "name": "device_status_water_level_chk",
-                                "definition": "CHECK (((water_level IS NULL) OR (water_level >= (0)::numeric)))"
-                            }
-                        ],
-                        "unique_constraints": [
-                        ]
-                    },
-                    "notifications": {
-                        "rls": {
-                            "forced": false,
-                            "enabled": true
-                        },
-                        "columns": [
-                            {
-                                "name": "id",
-                                "comment": null,
-                                "default": "gen_random_uuid()",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 1,
-                                "udt_name": "uuid",
-                                "data_type": "uuid",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "user_id",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 2,
-                                "udt_name": "uuid",
-                                "data_type": "uuid",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "device_id",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 3,
-                                "udt_name": "uuid",
-                                "data_type": "uuid",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "alert_id",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 4,
-                                "udt_name": "uuid",
-                                "data_type": "uuid",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "type",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 5,
-                                "udt_name": "text",
-                                "data_type": "text",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "title",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 6,
-                                "udt_name": "text",
-                                "data_type": "text",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "message",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 7,
-                                "udt_name": "text",
-                                "data_type": "text",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "is_read",
-                                "comment": null,
-                                "default": "false",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 8,
-                                "udt_name": "bool",
-                                "data_type": "boolean",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "created_at",
-                                "comment": null,
-                                "default": "now()",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 9,
-                                "udt_name": "timestamptz",
-                                "data_type": "timestamp with time zone",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "read_at",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 10,
-                                "udt_name": "timestamptz",
-                                "data_type": "timestamp with time zone",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            }
-                        ],
-                        "indexes": [
-                            {
-                                "name": "notifications_pkey",
-                                "valid": true,
-                                "unique": true,
-                                "columns": [
-                                    "id"
-                                ],
-                                "primary": true,
-                                "definition": "CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id)"
-                            },
-                            {
-                                "name": "notifications_unread_idx",
-                                "valid": true,
-                                "unique": false,
-                                "columns": [
-                                    "user_id",
-                                    "is_read"
-                                ],
-                                "primary": false,
-                                "definition": "CREATE INDEX notifications_unread_idx ON public.notifications USING btree (user_id, is_read) WHERE (is_read = false)"
-                            },
-                            {
-                                "name": "notifications_user_created_idx",
-                                "valid": true,
-                                "unique": false,
-                                "columns": [
-                                    "user_id",
-                                    "created_at"
-                                ],
-                                "primary": false,
-                                "definition": "CREATE INDEX notifications_user_created_idx ON public.notifications USING btree (user_id, created_at DESC)"
-                            }
-                        ],
-                        "triggers": [
-                        ],
-                        "description": "User-specific notifications generated from device events or alerts.",
-                        "primary_key": {
-                            "name": "notifications_pkey",
-                            "columns": [
-                                "id"
-                            ]
-                        },
-                        "foreign_keys": [
-                            {
-                                "name": "notifications_alert_id_fkey",
-                                "columns": [
-                                    "alert_id"
-                                ],
-                                "on_delete": "SET NULL",
-                                "on_update": "NO ACTION",
-                                "references": {
-                                    "table": "alerts",
-                                    "schema": "public",
-                                    "columns": [
-                                        "id"
-                                    ]
-                                }
-                            },
-                            {
-                                "name": "notifications_device_id_fkey",
-                                "columns": [
-                                    "device_id"
-                                ],
-                                "on_delete": "SET NULL",
-                                "on_update": "NO ACTION",
-                                "references": {
-                                    "table": "devices",
-                                    "schema": "public",
-                                    "columns": [
-                                        "id"
-                                    ]
-                                }
-                            },
-                            {
-                                "name": "notifications_user_id_fkey",
-                                "columns": [
-                                    "user_id"
-                                ],
-                                "on_delete": "CASCADE",
-                                "on_update": "NO ACTION",
-                                "references": {
-                                    "table": "users",
-                                    "schema": "auth",
-                                    "columns": [
-                                        "id"
-                                    ]
-                                }
-                            }
-                        ],
-                        "rls_policies": [
-                        ],
-                        "check_constraints": [
-                        ],
-                        "unique_constraints": [
-                        ]
-                    },
-                    "user_profiles": {
-                        "rls": {
-                            "forced": false,
-                            "enabled": true
-                        },
-                        "columns": [
-                            {
-                                "name": "id",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 1,
-                                "udt_name": "uuid",
-                                "data_type": "uuid",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "name",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 2,
-                                "udt_name": "text",
-                                "data_type": "text",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "phone",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 3,
-                                "udt_name": "text",
-                                "data_type": "text",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "created_at",
-                                "comment": null,
-                                "default": "now()",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 4,
-                                "udt_name": "timestamptz",
-                                "data_type": "timestamp with time zone",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "updated_at",
-                                "comment": null,
-                                "default": "now()",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 5,
-                                "udt_name": "timestamptz",
-                                "data_type": "timestamp with time zone",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            }
-                        ],
-                        "indexes": [
-                            {
-                                "name": "user_profiles_phone_unique_idx",
-                                "valid": true,
-                                "unique": true,
-                                "columns": [
-                                    "phone"
-                                ],
-                                "primary": false,
-                                "definition": "CREATE UNIQUE INDEX user_profiles_phone_unique_idx ON public.user_profiles USING btree (phone) WHERE (phone IS NOT NULL)"
-                            },
-                            {
-                                "name": "user_profiles_pkey",
-                                "valid": true,
-                                "unique": true,
-                                "columns": [
-                                    "id"
-                                ],
-                                "primary": true,
-                                "definition": "CREATE UNIQUE INDEX user_profiles_pkey ON public.user_profiles USING btree (id)"
-                            }
-                        ],
-                        "triggers": [
-                            {
-                                "name": "user_profiles_updated_at",
-                                "events": "CREATE TRIGGER user_profiles_updated_at BEFORE UPDATE ON public.user_profiles FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
-                                "enabled": "ENABLED",
-                                "function": "set_updated_at"
-                            }
-                        ],
-                        "description": "Additional profile information for Supabase Auth users.",
-                        "primary_key": {
-                            "name": "user_profiles_pkey",
-                            "columns": [
-                                "id"
-                            ]
-                        },
-                        "foreign_keys": [
-                            {
-                                "name": "user_profiles_id_fkey",
-                                "columns": [
-                                    "id"
-                                ],
-                                "on_delete": "CASCADE",
-                                "on_update": "NO ACTION",
-                                "references": {
-                                    "table": "users",
-                                    "schema": "auth",
-                                    "columns": [
-                                        "id"
-                                    ]
-                                }
-                            }
-                        ],
-                        "rls_policies": [
-                        ],
-                        "check_constraints": [
-                        ],
-                        "unique_constraints": [
-                        ]
-                    },
-                    "sensor_readings": {
-                        "rls": {
-                            "forced": false,
-                            "enabled": true
-                        },
-                        "columns": [
-                            {
-                                "name": "id",
-                                "comment": null,
-                                "default": "gen_random_uuid()",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 1,
-                                "udt_name": "uuid",
-                                "data_type": "uuid",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "device_id",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 2,
-                                "udt_name": "uuid",
-                                "data_type": "uuid",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "water_level",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 3,
-                                "udt_name": "numeric",
-                                "data_type": "numeric(8,3)",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "is_flood_detected",
-                                "comment": null,
-                                "default": "false",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 4,
-                                "udt_name": "bool",
-                                "data_type": "boolean",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "battery_level",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 5,
-                                "udt_name": "numeric",
-                                "data_type": "numeric(5,2)",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "signal_strength",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 6,
-                                "udt_name": "int4",
-                                "data_type": "integer",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "recorded_at",
-                                "comment": null,
-                                "default": "now()",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 7,
-                                "udt_name": "timestamptz",
-                                "data_type": "timestamp with time zone",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            }
-                        ],
-                        "indexes": [
-                            {
-                                "name": "sensor_readings_device_recorded_idx",
-                                "valid": true,
-                                "unique": false,
-                                "columns": [
-                                    "device_id",
-                                    "recorded_at"
-                                ],
-                                "primary": false,
-                                "definition": "CREATE INDEX sensor_readings_device_recorded_idx ON public.sensor_readings USING btree (device_id, recorded_at DESC)"
-                            },
-                            {
-                                "name": "sensor_readings_pkey",
-                                "valid": true,
-                                "unique": true,
-                                "columns": [
-                                    "id"
-                                ],
-                                "primary": true,
-                                "definition": "CREATE UNIQUE INDEX sensor_readings_pkey ON public.sensor_readings USING btree (id)"
-                            },
-                            {
-                                "name": "sensor_readings_recorded_at_idx",
-                                "valid": true,
-                                "unique": false,
-                                "columns": [
-                                    "recorded_at"
-                                ],
-                                "primary": false,
-                                "definition": "CREATE INDEX sensor_readings_recorded_at_idx ON public.sensor_readings USING btree (recorded_at DESC)"
-                            }
-                        ],
-                        "triggers": [
-                        ],
-                        "description": "Historical device telemetry data.",
-                        "primary_key": {
-                            "name": "sensor_readings_pkey",
-                            "columns": [
-                                "id"
-                            ]
-                        },
-                        "foreign_keys": [
-                            {
-                                "name": "sensor_readings_device_id_fkey",
-                                "columns": [
-                                    "device_id"
-                                ],
-                                "on_delete": "CASCADE",
-                                "on_update": "NO ACTION",
-                                "references": {
-                                    "table": "devices",
-                                    "schema": "public",
-                                    "columns": [
-                                        "id"
-                                    ]
-                                }
-                            }
-                        ],
-                        "rls_policies": [
-                        ],
-                        "check_constraints": [
-                            {
-                                "name": "sensor_readings_battery_chk",
-                                "definition": "CHECK (((battery_level IS NULL) OR ((battery_level >= (0)::numeric) AND (battery_level <= (100)::numeric))))"
-                            },
-                            {
-                                "name": "sensor_readings_water_level_chk",
-                                "definition": "CHECK (((water_level IS NULL) OR (water_level >= (0)::numeric)))"
-                            }
-                        ],
-                        "unique_constraints": [
-                        ]
-                    },
-                    "device_locations": {
-                        "rls": {
-                            "forced": false,
-                            "enabled": true
-                        },
-                        "columns": [
-                            {
-                                "name": "id",
-                                "comment": null,
-                                "default": "gen_random_uuid()",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 1,
-                                "udt_name": "uuid",
-                                "data_type": "uuid",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "device_id",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 2,
-                                "udt_name": "uuid",
-                                "data_type": "uuid",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "latitude",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 3,
-                                "udt_name": "numeric",
-                                "data_type": "numeric(10,7)",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "longitude",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 4,
-                                "udt_name": "numeric",
-                                "data_type": "numeric(10,7)",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "accuracy",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 5,
-                                "udt_name": "numeric",
-                                "data_type": "numeric(8,2)",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "recorded_at",
-                                "comment": null,
-                                "default": "now()",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 6,
-                                "udt_name": "timestamptz",
-                                "data_type": "timestamp with time zone",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            }
-                        ],
-                        "indexes": [
-                            {
-                                "name": "device_locations_device_recorded_idx",
-                                "valid": true,
-                                "unique": false,
-                                "columns": [
-                                    "device_id",
-                                    "recorded_at"
-                                ],
-                                "primary": false,
-                                "definition": "CREATE INDEX device_locations_device_recorded_idx ON public.device_locations USING btree (device_id, recorded_at DESC)"
-                            },
-                            {
-                                "name": "device_locations_pkey",
-                                "valid": true,
-                                "unique": true,
-                                "columns": [
-                                    "id"
-                                ],
-                                "primary": true,
-                                "definition": "CREATE UNIQUE INDEX device_locations_pkey ON public.device_locations USING btree (id)"
-                            }
-                        ],
-                        "triggers": [
-                        ],
-                        "description": "Historical GPS locations reported by TAGANA devices.",
-                        "primary_key": {
-                            "name": "device_locations_pkey",
-                            "columns": [
-                                "id"
-                            ]
-                        },
-                        "foreign_keys": [
-                            {
-                                "name": "device_locations_device_id_fkey",
-                                "columns": [
-                                    "device_id"
-                                ],
-                                "on_delete": "CASCADE",
-                                "on_update": "NO ACTION",
-                                "references": {
-                                    "table": "devices",
-                                    "schema": "public",
-                                    "columns": [
-                                        "id"
-                                    ]
-                                }
-                            }
-                        ],
-                        "rls_policies": [
-                        ],
-                        "check_constraints": [
-                            {
-                                "name": "device_locations_accuracy_chk",
-                                "definition": "CHECK (((accuracy IS NULL) OR (accuracy >= (0)::numeric)))"
-                            },
-                            {
-                                "name": "device_locations_latitude_chk",
-                                "definition": "CHECK (((latitude >= ('-90'::integer)::numeric) AND (latitude <= (90)::numeric)))"
-                            },
-                            {
-                                "name": "device_locations_longitude_chk",
-                                "definition": "CHECK (((longitude >= ('-180'::integer)::numeric) AND (longitude <= (180)::numeric)))"
-                            }
-                        ],
-                        "unique_constraints": [
-                        ]
-                    },
-                    "device_activities": {
-                        "rls": {
-                            "forced": false,
-                            "enabled": true
-                        },
-                        "columns": [
-                            {
-                                "name": "id",
-                                "comment": null,
-                                "default": "gen_random_uuid()",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 1,
-                                "udt_name": "uuid",
-                                "data_type": "uuid",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "device_id",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 2,
-                                "udt_name": "uuid",
-                                "data_type": "uuid",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "type",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 3,
-                                "udt_name": "device_activity_type",
-                                "data_type": "device_activity_type",
-                                "generated": null,
-                                "udt_schema": "public"
-                            },
-                            {
-                                "name": "title",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": false,
-                                "position": 4,
-                                "udt_name": "text",
-                                "data_type": "text",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "description",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 5,
-                                "udt_name": "text",
-                                "data_type": "text",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "metadata",
-                                "comment": null,
-                                "default": null,
-                                "identity": null,
-                                "nullable": true,
-                                "position": 6,
-                                "udt_name": "jsonb",
-                                "data_type": "jsonb",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            },
-                            {
-                                "name": "created_at",
-                                "comment": null,
-                                "default": "now()",
-                                "identity": null,
-                                "nullable": false,
-                                "position": 7,
-                                "udt_name": "timestamptz",
-                                "data_type": "timestamp with time zone",
-                                "generated": null,
-                                "udt_schema": "pg_catalog"
-                            }
-                        ],
-                        "indexes": [
-                            {
-                                "name": "device_activities_device_created_idx",
-                                "valid": true,
-                                "unique": false,
-                                "columns": [
-                                    "device_id",
-                                    "created_at"
-                                ],
-                                "primary": false,
-                                "definition": "CREATE INDEX device_activities_device_created_idx ON public.device_activities USING btree (device_id, created_at DESC)"
-                            },
-                            {
-                                "name": "device_activities_pkey",
-                                "valid": true,
-                                "unique": true,
-                                "columns": [
-                                    "id"
-                                ],
-                                "primary": true,
-                                "definition": "CREATE UNIQUE INDEX device_activities_pkey ON public.device_activities USING btree (id)"
-                            }
-                        ],
-                        "triggers": [
-                        ],
-                        "description": "Activity/event log for TAGANA devices.",
-                        "primary_key": {
-                            "name": "device_activities_pkey",
-                            "columns": [
-                                "id"
-                            ]
-                        },
-                        "foreign_keys": [
-                            {
-                                "name": "device_activities_device_id_fkey",
-                                "columns": [
-                                    "device_id"
-                                ],
-                                "on_delete": "CASCADE",
-                                "on_update": "NO ACTION",
-                                "references": {
-                                    "table": "devices",
-                                    "schema": "public",
-                                    "columns": [
-                                        "id"
-                                    ]
-                                }
-                            }
-                        ],
-                        "rls_policies": [
-                        ],
-                        "check_constraints": [
-                        ],
-                        "unique_constraints": [
-                        ]
-                    }
-                },
-                "functions": {
-                    "set_updated_at": {
-                        "schema": "public",
-                        "language": "plpgsql",
-                        "arguments": "",
-                        "definition": "CREATE OR REPLACE FUNCTION public.set_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n    NEW.updated_at = NOW();\r\n    RETURN NEW;\r\nEND;\r\n$function$\n",
-                        "return_type": "trigger"
-                    }
-                }
-            }
+    "enums": [
+        {
+            "name": "alert_severity",
+            "schema": "public",
+            "values": [
+                "info",
+                "warning",
+                "critical"
+            ]
         },
-        "realtime": {
-            "supabase_realtime": [
+        {
+            "name": "alert_status",
+            "schema": "public",
+            "values": [
+                "active",
+                "resolved"
+            ]
+        },
+        {
+            "name": "alert_type",
+            "schema": "public",
+            "values": [
+                "high_water_level",
+                "flood_detected",
+                "low_battery",
+                "device_offline",
+                "connection_lost"
+            ]
+        },
+        {
+            "name": "device_activity_type",
+            "schema": "public",
+            "values": [
+                "device_registered",
+                "device_connected",
+                "device_disconnected",
+                "ble_connected",
+                "ble_disconnected",
+                "wifi_configured",
+                "wifi_connected",
+                "wifi_disconnected",
+                "data_sync",
+                "firmware_updated",
+                "network_reset",
+                "emergency_mode"
+            ]
+        },
+        {
+            "name": "device_status_type",
+            "schema": "public",
+            "values": [
+                "online",
+                "offline",
+                "warning",
+                "critical"
+            ]
+        },
+        {
+            "name": "notification_type",
+            "schema": "public",
+            "values": [
+                "flood_warning",
+                "high_water",
+                "low_battery",
+                "device_offline",
+                "device_online",
+                "system"
+            ]
+        }
+    ],
+    "schema": "public",
+    "tables": [
+        {
+            "type": "BASE TABLE",
+            "table": "alerts",
+            "schema": "public",
+            "columns": [
                 {
-                    "table": "device_status",
-                    "schema": "public"
+                    "name": "id",
+                    "default": "gen_random_uuid()",
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 1,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "device_id",
+                    "default": null,
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 2,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "type",
+                    "default": null,
+                    "udt_name": "alert_type",
+                    "data_type": "USER-DEFINED",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 3,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "severity",
+                    "default": null,
+                    "udt_name": "alert_severity",
+                    "data_type": "USER-DEFINED",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 4,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "status",
+                    "default": "'active'::alert_status",
+                    "udt_name": "alert_status",
+                    "data_type": "USER-DEFINED",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 5,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "value",
+                    "default": null,
+                    "udt_name": "numeric",
+                    "data_type": "numeric",
+                    "max_length": null,
+                    "is_nullable": "YES",
+                    "numeric_scale": null,
+                    "ordinal_position": 6,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "threshold",
+                    "default": null,
+                    "udt_name": "numeric",
+                    "data_type": "numeric",
+                    "max_length": null,
+                    "is_nullable": "YES",
+                    "numeric_scale": null,
+                    "ordinal_position": 7,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "message",
+                    "default": null,
+                    "udt_name": "text",
+                    "data_type": "text",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 8,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "triggered_at",
+                    "default": "now()",
+                    "udt_name": "timestamptz",
+                    "data_type": "timestamp with time zone",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 9,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "resolved_at",
+                    "default": null,
+                    "udt_name": "timestamptz",
+                    "data_type": "timestamp with time zone",
+                    "max_length": null,
+                    "is_nullable": "YES",
+                    "numeric_scale": null,
+                    "ordinal_position": 10,
+                    "numeric_precision": null
+                }
+            ]
+        },
+        {
+            "type": "BASE TABLE",
+            "table": "device_activities",
+            "schema": "public",
+            "columns": [
+                {
+                    "name": "id",
+                    "default": "gen_random_uuid()",
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 1,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "device_id",
+                    "default": null,
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 2,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "type",
+                    "default": null,
+                    "udt_name": "device_activity_type",
+                    "data_type": "USER-DEFINED",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 3,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "title",
+                    "default": null,
+                    "udt_name": "text",
+                    "data_type": "text",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 4,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "description",
+                    "default": null,
+                    "udt_name": "text",
+                    "data_type": "text",
+                    "max_length": null,
+                    "is_nullable": "YES",
+                    "numeric_scale": null,
+                    "ordinal_position": 5,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "metadata",
+                    "default": null,
+                    "udt_name": "jsonb",
+                    "data_type": "jsonb",
+                    "max_length": null,
+                    "is_nullable": "YES",
+                    "numeric_scale": null,
+                    "ordinal_position": 6,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "created_at",
+                    "default": "now()",
+                    "udt_name": "timestamptz",
+                    "data_type": "timestamp with time zone",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 7,
+                    "numeric_precision": null
+                }
+            ]
+        },
+        {
+            "type": "BASE TABLE",
+            "table": "device_locations",
+            "schema": "public",
+            "columns": [
+                {
+                    "name": "id",
+                    "default": "gen_random_uuid()",
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 1,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "device_id",
+                    "default": null,
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 2,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "latitude",
+                    "default": null,
+                    "udt_name": "numeric",
+                    "data_type": "numeric",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": 7,
+                    "ordinal_position": 3,
+                    "numeric_precision": 10
+                },
+                {
+                    "name": "longitude",
+                    "default": null,
+                    "udt_name": "numeric",
+                    "data_type": "numeric",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": 7,
+                    "ordinal_position": 4,
+                    "numeric_precision": 10
+                },
+                {
+                    "name": "accuracy",
+                    "default": null,
+                    "udt_name": "numeric",
+                    "data_type": "numeric",
+                    "max_length": null,
+                    "is_nullable": "YES",
+                    "numeric_scale": 2,
+                    "ordinal_position": 5,
+                    "numeric_precision": 8
+                },
+                {
+                    "name": "recorded_at",
+                    "default": "now()",
+                    "udt_name": "timestamptz",
+                    "data_type": "timestamp with time zone",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 6,
+                    "numeric_precision": null
+                }
+            ]
+        },
+        {
+            "type": "BASE TABLE",
+            "table": "device_status",
+            "schema": "public",
+            "columns": [
+                {
+                    "name": "device_id",
+                    "default": null,
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 1,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "status",
+                    "default": "'offline'::device_status_type",
+                    "udt_name": "device_status_type",
+                    "data_type": "USER-DEFINED",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 2,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "water_level",
+                    "default": null,
+                    "udt_name": "numeric",
+                    "data_type": "numeric",
+                    "max_length": null,
+                    "is_nullable": "YES",
+                    "numeric_scale": 2,
+                    "ordinal_position": 3,
+                    "numeric_precision": 10
+                },
+                {
+                    "name": "battery_level",
+                    "default": null,
+                    "udt_name": "numeric",
+                    "data_type": "numeric",
+                    "max_length": null,
+                    "is_nullable": "YES",
+                    "numeric_scale": 2,
+                    "ordinal_position": 4,
+                    "numeric_precision": 5
+                },
+                {
+                    "name": "signal_strength",
+                    "default": null,
+                    "udt_name": "int4",
+                    "data_type": "integer",
+                    "max_length": null,
+                    "is_nullable": "YES",
+                    "numeric_scale": 0,
+                    "ordinal_position": 5,
+                    "numeric_precision": 32
+                },
+                {
+                    "name": "is_flood_detected",
+                    "default": "false",
+                    "udt_name": "bool",
+                    "data_type": "boolean",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 6,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "last_seen_at",
+                    "default": null,
+                    "udt_name": "timestamptz",
+                    "data_type": "timestamp with time zone",
+                    "max_length": null,
+                    "is_nullable": "YES",
+                    "numeric_scale": null,
+                    "ordinal_position": 7,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "updated_at",
+                    "default": "now()",
+                    "udt_name": "timestamptz",
+                    "data_type": "timestamp with time zone",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 8,
+                    "numeric_precision": null
+                }
+            ]
+        },
+        {
+            "type": "BASE TABLE",
+            "table": "devices",
+            "schema": "public",
+            "columns": [
+                {
+                    "name": "id",
+                    "default": "gen_random_uuid()",
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 1,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "user_id",
+                    "default": null,
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 2,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "device_code",
+                    "default": null,
+                    "udt_name": "text",
+                    "data_type": "text",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 3,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "device_name",
+                    "default": null,
+                    "udt_name": "text",
+                    "data_type": "text",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 4,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "device_token_hash",
+                    "default": null,
+                    "udt_name": "text",
+                    "data_type": "text",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 5,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "firmware_version",
+                    "default": null,
+                    "udt_name": "text",
+                    "data_type": "text",
+                    "max_length": null,
+                    "is_nullable": "YES",
+                    "numeric_scale": null,
+                    "ordinal_position": 6,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "is_active",
+                    "default": "true",
+                    "udt_name": "bool",
+                    "data_type": "boolean",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 7,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "registered_at",
+                    "default": "now()",
+                    "udt_name": "timestamptz",
+                    "data_type": "timestamp with time zone",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 8,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "updated_at",
+                    "default": "now()",
+                    "udt_name": "timestamptz",
+                    "data_type": "timestamp with time zone",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 9,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "token_created_at",
+                    "default": null,
+                    "udt_name": "timestamptz",
+                    "data_type": "timestamp with time zone",
+                    "max_length": null,
+                    "is_nullable": "YES",
+                    "numeric_scale": null,
+                    "ordinal_position": 10,
+                    "numeric_precision": null
+                }
+            ]
+        },
+        {
+            "type": "BASE TABLE",
+            "table": "notifications",
+            "schema": "public",
+            "columns": [
+                {
+                    "name": "id",
+                    "default": "gen_random_uuid()",
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 1,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "user_id",
+                    "default": null,
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 2,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "device_id",
+                    "default": null,
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "max_length": null,
+                    "is_nullable": "YES",
+                    "numeric_scale": null,
+                    "ordinal_position": 3,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "type",
+                    "default": null,
+                    "udt_name": "notification_type",
+                    "data_type": "USER-DEFINED",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 4,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "title",
+                    "default": null,
+                    "udt_name": "text",
+                    "data_type": "text",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 5,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "message",
+                    "default": null,
+                    "udt_name": "text",
+                    "data_type": "text",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 6,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "is_read",
+                    "default": "false",
+                    "udt_name": "bool",
+                    "data_type": "boolean",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 7,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "created_at",
+                    "default": "now()",
+                    "udt_name": "timestamptz",
+                    "data_type": "timestamp with time zone",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 8,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "read_at",
+                    "default": null,
+                    "udt_name": "timestamptz",
+                    "data_type": "timestamp with time zone",
+                    "max_length": null,
+                    "is_nullable": "YES",
+                    "numeric_scale": null,
+                    "ordinal_position": 9,
+                    "numeric_precision": null
+                }
+            ]
+        },
+        {
+            "type": "BASE TABLE",
+            "table": "sensor_readings",
+            "schema": "public",
+            "columns": [
+                {
+                    "name": "id",
+                    "default": "gen_random_uuid()",
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 1,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "device_id",
+                    "default": null,
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 2,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "water_level",
+                    "default": null,
+                    "udt_name": "numeric",
+                    "data_type": "numeric",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": 2,
+                    "ordinal_position": 3,
+                    "numeric_precision": 10
+                },
+                {
+                    "name": "battery_level",
+                    "default": null,
+                    "udt_name": "numeric",
+                    "data_type": "numeric",
+                    "max_length": null,
+                    "is_nullable": "YES",
+                    "numeric_scale": 2,
+                    "ordinal_position": 4,
+                    "numeric_precision": 5
+                },
+                {
+                    "name": "signal_strength",
+                    "default": null,
+                    "udt_name": "int4",
+                    "data_type": "integer",
+                    "max_length": null,
+                    "is_nullable": "YES",
+                    "numeric_scale": 0,
+                    "ordinal_position": 5,
+                    "numeric_precision": 32
+                },
+                {
+                    "name": "is_flood_detected",
+                    "default": "false",
+                    "udt_name": "bool",
+                    "data_type": "boolean",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 6,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "latitude",
+                    "default": null,
+                    "udt_name": "numeric",
+                    "data_type": "numeric",
+                    "max_length": null,
+                    "is_nullable": "YES",
+                    "numeric_scale": 7,
+                    "ordinal_position": 7,
+                    "numeric_precision": 10
+                },
+                {
+                    "name": "longitude",
+                    "default": null,
+                    "udt_name": "numeric",
+                    "data_type": "numeric",
+                    "max_length": null,
+                    "is_nullable": "YES",
+                    "numeric_scale": 7,
+                    "ordinal_position": 8,
+                    "numeric_precision": 10
+                },
+                {
+                    "name": "recorded_at",
+                    "default": "now()",
+                    "udt_name": "timestamptz",
+                    "data_type": "timestamp with time zone",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 9,
+                    "numeric_precision": null
+                }
+            ]
+        },
+        {
+            "type": "BASE TABLE",
+            "table": "user_profiles",
+            "schema": "public",
+            "columns": [
+                {
+                    "name": "id",
+                    "default": null,
+                    "udt_name": "uuid",
+                    "data_type": "uuid",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 1,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "name",
+                    "default": null,
+                    "udt_name": "text",
+                    "data_type": "text",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 2,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "phone",
+                    "default": null,
+                    "udt_name": "text",
+                    "data_type": "text",
+                    "max_length": null,
+                    "is_nullable": "YES",
+                    "numeric_scale": null,
+                    "ordinal_position": 3,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "created_at",
+                    "default": "now()",
+                    "udt_name": "timestamptz",
+                    "data_type": "timestamp with time zone",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 4,
+                    "numeric_precision": null
+                },
+                {
+                    "name": "updated_at",
+                    "default": "now()",
+                    "udt_name": "timestamptz",
+                    "data_type": "timestamp with time zone",
+                    "max_length": null,
+                    "is_nullable": "NO",
+                    "numeric_scale": null,
+                    "ordinal_position": 5,
+                    "numeric_precision": null
                 }
             ]
         }
-    },
-    "generated_at": "2026-08-18T18:47:35.584977+00:00",
-    "metadata_version": "1.0"
+    ],
+    "indexes": [
+        {
+            "name": "alerts_active_idx",
+            "table": "public",
+            "definition": "CREATE INDEX alerts_active_idx ON public.alerts USING btree (device_id, status) WHERE (status = 'active'::alert_status)"
+        },
+        {
+            "name": "alerts_device_triggered_idx",
+            "table": "public",
+            "definition": "CREATE INDEX alerts_device_triggered_idx ON public.alerts USING btree (device_id, triggered_at DESC)"
+        },
+        {
+            "name": "alerts_pkey",
+            "table": "public",
+            "definition": "CREATE UNIQUE INDEX alerts_pkey ON public.alerts USING btree (id)"
+        },
+        {
+            "name": "device_activities_device_created_idx",
+            "table": "public",
+            "definition": "CREATE INDEX device_activities_device_created_idx ON public.device_activities USING btree (device_id, created_at DESC)"
+        },
+        {
+            "name": "device_activities_pkey",
+            "table": "public",
+            "definition": "CREATE UNIQUE INDEX device_activities_pkey ON public.device_activities USING btree (id)"
+        },
+        {
+            "name": "device_locations_device_recorded_idx",
+            "table": "public",
+            "definition": "CREATE INDEX device_locations_device_recorded_idx ON public.device_locations USING btree (device_id, recorded_at DESC)"
+        },
+        {
+            "name": "device_locations_pkey",
+            "table": "public",
+            "definition": "CREATE UNIQUE INDEX device_locations_pkey ON public.device_locations USING btree (id)"
+        },
+        {
+            "name": "device_status_pkey",
+            "table": "public",
+            "definition": "CREATE UNIQUE INDEX device_status_pkey ON public.device_status USING btree (device_id)"
+        },
+        {
+            "name": "devices_device_code_key",
+            "table": "public",
+            "definition": "CREATE UNIQUE INDEX devices_device_code_key ON public.devices USING btree (device_code)"
+        },
+        {
+            "name": "devices_pkey",
+            "table": "public",
+            "definition": "CREATE UNIQUE INDEX devices_pkey ON public.devices USING btree (id)"
+        },
+        {
+            "name": "idx_devices_is_active",
+            "table": "public",
+            "definition": "CREATE INDEX idx_devices_is_active ON public.devices USING btree (is_active)"
+        },
+        {
+            "name": "idx_devices_user_id",
+            "table": "public",
+            "definition": "CREATE INDEX idx_devices_user_id ON public.devices USING btree (user_id)"
+        },
+        {
+            "name": "idx_notifications_created_at",
+            "table": "public",
+            "definition": "CREATE INDEX idx_notifications_created_at ON public.notifications USING btree (created_at DESC)"
+        },
+        {
+            "name": "idx_notifications_device_id",
+            "table": "public",
+            "definition": "CREATE INDEX idx_notifications_device_id ON public.notifications USING btree (device_id)"
+        },
+        {
+            "name": "idx_notifications_unread",
+            "table": "public",
+            "definition": "CREATE INDEX idx_notifications_unread ON public.notifications USING btree (user_id, is_read) WHERE (is_read = false)"
+        },
+        {
+            "name": "idx_notifications_user_id",
+            "table": "public",
+            "definition": "CREATE INDEX idx_notifications_user_id ON public.notifications USING btree (user_id)"
+        },
+        {
+            "name": "notifications_pkey",
+            "table": "public",
+            "definition": "CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id)"
+        },
+        {
+            "name": "idx_sensor_readings_device_id",
+            "table": "public",
+            "definition": "CREATE INDEX idx_sensor_readings_device_id ON public.sensor_readings USING btree (device_id)"
+        },
+        {
+            "name": "idx_sensor_readings_device_recorded",
+            "table": "public",
+            "definition": "CREATE INDEX idx_sensor_readings_device_recorded ON public.sensor_readings USING btree (device_id, recorded_at DESC)"
+        },
+        {
+            "name": "idx_sensor_readings_recorded_at",
+            "table": "public",
+            "definition": "CREATE INDEX idx_sensor_readings_recorded_at ON public.sensor_readings USING btree (recorded_at DESC)"
+        },
+        {
+            "name": "sensor_readings_pkey",
+            "table": "public",
+            "definition": "CREATE UNIQUE INDEX sensor_readings_pkey ON public.sensor_readings USING btree (id)"
+        },
+        {
+            "name": "user_profiles_phone_unique_idx",
+            "table": "public",
+            "definition": "CREATE UNIQUE INDEX user_profiles_phone_unique_idx ON public.user_profiles USING btree (phone) WHERE (phone IS NOT NULL)"
+        },
+        {
+            "name": "user_profiles_pkey",
+            "table": "public",
+            "definition": "CREATE UNIQUE INDEX user_profiles_pkey ON public.user_profiles USING btree (id)"
+        }
+    ],
+    "database": "TAGANA-APP",
+    "realtime": [
+        {
+            "table": "alerts",
+            "schema": "public"
+        },
+        {
+            "table": "device_status",
+            "schema": "public"
+        },
+        {
+            "table": "notifications",
+            "schema": "public"
+        }
+    ],
+    "triggers": [
+        {
+            "name": "device_status_set_updated_at",
+            "event": "UPDATE",
+            "table": "device_status",
+            "schema": "public",
+            "action_timing": "BEFORE",
+            "action_statement": "EXECUTE FUNCTION set_updated_at()"
+        },
+        {
+            "name": "devices_create_status",
+            "event": "INSERT",
+            "table": "devices",
+            "schema": "public",
+            "action_timing": "AFTER",
+            "action_statement": "EXECUTE FUNCTION create_device_status()"
+        },
+        {
+            "name": "devices_set_updated_at",
+            "event": "UPDATE",
+            "table": "devices",
+            "schema": "public",
+            "action_timing": "BEFORE",
+            "action_statement": "EXECUTE FUNCTION set_updated_at()"
+        },
+        {
+            "name": "user_profiles_updated_at",
+            "event": "UPDATE",
+            "table": "user_profiles",
+            "schema": "public",
+            "action_timing": "BEFORE",
+            "action_statement": "EXECUTE FUNCTION set_updated_at()"
+        }
+    ],
+    "functions": [
+        {
+            "name": "create_device_status",
+            "schema": "public",
+            "language": "plpgsql",
+            "security": "DEFINER",
+            "arguments": "",
+            "definition": "CREATE OR REPLACE FUNCTION public.create_device_status()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\nbegin\r\n\r\n    insert into public.device_status (\r\n        device_id,\r\n        status,\r\n        last_seen_at\r\n    )\r\n    values (\r\n        new.id,\r\n        'offline',\r\n        null\r\n    );\r\n\r\n    return new;\r\n\r\nend;\r\n$function$\n",
+            "return_type": "trigger"
+        },
+        {
+            "name": "set_updated_at",
+            "schema": "public",
+            "language": "plpgsql",
+            "security": "INVOKER",
+            "arguments": "",
+            "definition": "CREATE OR REPLACE FUNCTION public.set_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nbegin\r\n    new.updated_at = now();\r\n    return new;\r\nend;\r\n$function$\n",
+            "return_type": "trigger"
+        }
+    ],
+    "rls_status": [
+        {
+            "table": "alerts",
+            "schema": "public",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "device_activities",
+            "schema": "public",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "device_locations",
+            "schema": "public",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "device_status",
+            "schema": "public",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "devices",
+            "schema": "public",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "notifications",
+            "schema": "public",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "sensor_readings",
+            "schema": "public",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "user_profiles",
+            "schema": "public",
+            "rls_forced": false,
+            "rls_enabled": true
+        }
+    ],
+    "exported_at": "2026-08-18T19:26:43.818729+00:00",
+    "foreign_keys": [
+        {
+            "table": "alerts",
+            "column": "device_id",
+            "on_delete": "CASCADE",
+            "on_update": "NO ACTION",
+            "constraint": "alerts_device_id_fkey",
+            "foreign_table": "devices",
+            "foreign_column": "id"
+        },
+        {
+            "table": "device_activities",
+            "column": "device_id",
+            "on_delete": "CASCADE",
+            "on_update": "NO ACTION",
+            "constraint": "device_activities_device_id_fkey",
+            "foreign_table": "devices",
+            "foreign_column": "id"
+        },
+        {
+            "table": "device_locations",
+            "column": "device_id",
+            "on_delete": "CASCADE",
+            "on_update": "NO ACTION",
+            "constraint": "device_locations_device_id_fkey",
+            "foreign_table": "devices",
+            "foreign_column": "id"
+        },
+        {
+            "table": "device_status",
+            "column": "device_id",
+            "on_delete": "CASCADE",
+            "on_update": "NO ACTION",
+            "constraint": "device_status_device_id_fkey",
+            "foreign_table": "devices",
+            "foreign_column": "id"
+        },
+        {
+            "table": "notifications",
+            "column": "device_id",
+            "on_delete": "CASCADE",
+            "on_update": "NO ACTION",
+            "constraint": "notifications_device_id_fkey",
+            "foreign_table": "devices",
+            "foreign_column": "id"
+        },
+        {
+            "table": "sensor_readings",
+            "column": "device_id",
+            "on_delete": "CASCADE",
+            "on_update": "NO ACTION",
+            "constraint": "sensor_readings_device_id_fkey",
+            "foreign_table": "devices",
+            "foreign_column": "id"
+        }
+    ],
+    "primary_keys": [
+        {
+            "table": "alerts",
+            "columns": [
+                "id"
+            ],
+            "constraint": "alerts_pkey"
+        },
+        {
+            "table": "device_activities",
+            "columns": [
+                "id"
+            ],
+            "constraint": "device_activities_pkey"
+        },
+        {
+            "table": "device_locations",
+            "columns": [
+                "id"
+            ],
+            "constraint": "device_locations_pkey"
+        },
+        {
+            "table": "device_status",
+            "columns": [
+                "device_id"
+            ],
+            "constraint": "device_status_pkey"
+        },
+        {
+            "table": "devices",
+            "columns": [
+                "id"
+            ],
+            "constraint": "devices_pkey"
+        },
+        {
+            "table": "notifications",
+            "columns": [
+                "id"
+            ],
+            "constraint": "notifications_pkey"
+        },
+        {
+            "table": "sensor_readings",
+            "columns": [
+                "id"
+            ],
+            "constraint": "sensor_readings_pkey"
+        },
+        {
+            "table": "user_profiles",
+            "columns": [
+                "id"
+            ],
+            "constraint": "user_profiles_pkey"
+        }
+    ],
+    "rls_policies": [
+        {
+            "roles": [
+                "authenticated"
+            ],
+            "table": "public.alerts",
+            "using": "(EXISTS ( SELECT 1\n   FROM devices d\n  WHERE ((d.id = alerts.device_id) AND (d.user_id = auth.uid()))))",
+            "policy": "Users can view their alerts",
+            "command": "SELECT",
+            "permissive": "PERMISSIVE",
+            "with_check": null
+        },
+        {
+            "roles": [
+                "authenticated"
+            ],
+            "table": "public.device_activities",
+            "using": "(EXISTS ( SELECT 1\n   FROM devices d\n  WHERE ((d.id = device_activities.device_id) AND (d.user_id = auth.uid()))))",
+            "policy": "Users can view their device activities",
+            "command": "SELECT",
+            "permissive": "PERMISSIVE",
+            "with_check": null
+        },
+        {
+            "roles": [
+                "authenticated"
+            ],
+            "table": "public.device_locations",
+            "using": "(EXISTS ( SELECT 1\n   FROM devices d\n  WHERE ((d.id = device_locations.device_id) AND (d.user_id = auth.uid()))))",
+            "policy": "Users can view their device locations",
+            "command": "SELECT",
+            "permissive": "PERMISSIVE",
+            "with_check": null
+        },
+        {
+            "roles": [
+                "authenticated"
+            ],
+            "table": "public.device_status",
+            "using": "(EXISTS ( SELECT 1\n   FROM devices d\n  WHERE ((d.id = device_status.device_id) AND (d.user_id = auth.uid()))))",
+            "policy": "Users can update their device status",
+            "command": "UPDATE",
+            "permissive": "PERMISSIVE",
+            "with_check": "(EXISTS ( SELECT 1\n   FROM devices d\n  WHERE ((d.id = device_status.device_id) AND (d.user_id = auth.uid()))))"
+        },
+        {
+            "roles": [
+                "authenticated"
+            ],
+            "table": "public.device_status",
+            "using": "(EXISTS ( SELECT 1\n   FROM devices d\n  WHERE ((d.id = device_status.device_id) AND (d.user_id = auth.uid()))))",
+            "policy": "Users can view their device status",
+            "command": "SELECT",
+            "permissive": "PERMISSIVE",
+            "with_check": null
+        },
+        {
+            "roles": [
+                "authenticated"
+            ],
+            "table": "public.devices",
+            "using": null,
+            "policy": "Users can create their own devices",
+            "command": "INSERT",
+            "permissive": "PERMISSIVE",
+            "with_check": "(user_id = auth.uid())"
+        },
+        {
+            "roles": [
+                "authenticated"
+            ],
+            "table": "public.devices",
+            "using": "(user_id = auth.uid())",
+            "policy": "Users can delete their own devices",
+            "command": "DELETE",
+            "permissive": "PERMISSIVE",
+            "with_check": null
+        },
+        {
+            "roles": [
+                "authenticated"
+            ],
+            "table": "public.devices",
+            "using": "(user_id = auth.uid())",
+            "policy": "Users can update their own devices",
+            "command": "UPDATE",
+            "permissive": "PERMISSIVE",
+            "with_check": "(user_id = auth.uid())"
+        },
+        {
+            "roles": [
+                "authenticated"
+            ],
+            "table": "public.devices",
+            "using": "(user_id = auth.uid())",
+            "policy": "Users can view their own devices",
+            "command": "SELECT",
+            "permissive": "PERMISSIVE",
+            "with_check": null
+        },
+        {
+            "roles": [
+                "authenticated"
+            ],
+            "table": "public.notifications",
+            "using": "(user_id = auth.uid())",
+            "policy": "Users can delete their notifications",
+            "command": "DELETE",
+            "permissive": "PERMISSIVE",
+            "with_check": null
+        },
+        {
+            "roles": [
+                "authenticated"
+            ],
+            "table": "public.notifications",
+            "using": "(user_id = auth.uid())",
+            "policy": "Users can update their notifications",
+            "command": "UPDATE",
+            "permissive": "PERMISSIVE",
+            "with_check": "(user_id = auth.uid())"
+        },
+        {
+            "roles": [
+                "authenticated"
+            ],
+            "table": "public.notifications",
+            "using": "(user_id = auth.uid())",
+            "policy": "Users can view their notifications",
+            "command": "SELECT",
+            "permissive": "PERMISSIVE",
+            "with_check": null
+        },
+        {
+            "roles": [
+                "authenticated"
+            ],
+            "table": "public.sensor_readings",
+            "using": "(EXISTS ( SELECT 1\n   FROM devices d\n  WHERE ((d.id = sensor_readings.device_id) AND (d.user_id = auth.uid()))))",
+            "policy": "Users can view their sensor readings",
+            "command": "SELECT",
+            "permissive": "PERMISSIVE",
+            "with_check": null
+        },
+        {
+            "roles": [
+                "authenticated"
+            ],
+            "table": "public.user_profiles",
+            "using": "(id = auth.uid())",
+            "policy": "Users can update their own profile",
+            "command": "UPDATE",
+            "permissive": "PERMISSIVE",
+            "with_check": "(id = auth.uid())"
+        },
+        {
+            "roles": [
+                "authenticated"
+            ],
+            "table": "public.user_profiles",
+            "using": "(id = auth.uid())",
+            "policy": "Users can view their own profile",
+            "command": "SELECT",
+            "permissive": "PERMISSIVE",
+            "with_check": null
+        }
+    ],
+    "check_constraints": [
+        {
+            "table": "alerts",
+            "constraint": "2200_17656_2_not_null",
+            "definition": "device_id IS NOT NULL"
+        },
+        {
+            "table": "alerts",
+            "constraint": "2200_17656_3_not_null",
+            "definition": "type IS NOT NULL"
+        },
+        {
+            "table": "alerts",
+            "constraint": "2200_17656_4_not_null",
+            "definition": "severity IS NOT NULL"
+        },
+        {
+            "table": "alerts",
+            "constraint": "2200_17656_5_not_null",
+            "definition": "status IS NOT NULL"
+        },
+        {
+            "table": "alerts",
+            "constraint": "2200_17656_8_not_null",
+            "definition": "message IS NOT NULL"
+        },
+        {
+            "table": "alerts",
+            "constraint": "2200_17656_9_not_null",
+            "definition": "triggered_at IS NOT NULL"
+        },
+        {
+            "table": "alerts",
+            "constraint": "2200_17656_1_not_null",
+            "definition": "id IS NOT NULL"
+        },
+        {
+            "table": "device_activities",
+            "constraint": "2200_17641_1_not_null",
+            "definition": "id IS NOT NULL"
+        },
+        {
+            "table": "device_activities",
+            "constraint": "2200_17641_2_not_null",
+            "definition": "device_id IS NOT NULL"
+        },
+        {
+            "table": "device_activities",
+            "constraint": "2200_17641_3_not_null",
+            "definition": "type IS NOT NULL"
+        },
+        {
+            "table": "device_activities",
+            "constraint": "2200_17641_4_not_null",
+            "definition": "title IS NOT NULL"
+        },
+        {
+            "table": "device_activities",
+            "constraint": "2200_17641_7_not_null",
+            "definition": "created_at IS NOT NULL"
+        },
+        {
+            "table": "device_locations",
+            "constraint": "device_locations_accuracy_chk",
+            "definition": "((accuracy IS NULL) OR (accuracy >= (0)::numeric))"
+        },
+        {
+            "table": "device_locations",
+            "constraint": "device_locations_latitude_chk",
+            "definition": "((latitude >= ('-90'::integer)::numeric) AND (latitude <= (90)::numeric))"
+        },
+        {
+            "table": "device_locations",
+            "constraint": "device_locations_longitude_chk",
+            "definition": "((longitude >= ('-180'::integer)::numeric) AND (longitude <= (180)::numeric))"
+        },
+        {
+            "table": "device_locations",
+            "constraint": "2200_17625_1_not_null",
+            "definition": "id IS NOT NULL"
+        },
+        {
+            "table": "device_locations",
+            "constraint": "2200_17625_2_not_null",
+            "definition": "device_id IS NOT NULL"
+        },
+        {
+            "table": "device_locations",
+            "constraint": "2200_17625_3_not_null",
+            "definition": "latitude IS NOT NULL"
+        },
+        {
+            "table": "device_locations",
+            "constraint": "2200_17625_4_not_null",
+            "definition": "longitude IS NOT NULL"
+        },
+        {
+            "table": "device_locations",
+            "constraint": "2200_17625_6_not_null",
+            "definition": "recorded_at IS NOT NULL"
+        },
+        {
+            "table": "device_status",
+            "constraint": "device_status_battery_check",
+            "definition": "((battery_level IS NULL) OR ((battery_level >= (0)::numeric) AND (battery_level <= (100)::numeric)))"
+        },
+        {
+            "table": "device_status",
+            "constraint": "2200_17765_8_not_null",
+            "definition": "updated_at IS NOT NULL"
+        },
+        {
+            "table": "device_status",
+            "constraint": "2200_17765_6_not_null",
+            "definition": "is_flood_detected IS NOT NULL"
+        },
+        {
+            "table": "device_status",
+            "constraint": "2200_17765_2_not_null",
+            "definition": "status IS NOT NULL"
+        },
+        {
+            "table": "device_status",
+            "constraint": "2200_17765_1_not_null",
+            "definition": "device_id IS NOT NULL"
+        },
+        {
+            "table": "device_status",
+            "constraint": "device_status_water_level_check",
+            "definition": "((water_level IS NULL) OR (water_level >= (0)::numeric))"
+        },
+        {
+            "table": "devices",
+            "constraint": "2200_17745_4_not_null",
+            "definition": "device_name IS NOT NULL"
+        },
+        {
+            "table": "devices",
+            "constraint": "devices_device_code_length",
+            "definition": "(char_length(device_code) >= 3)"
+        },
+        {
+            "table": "devices",
+            "constraint": "devices_device_name_length",
+            "definition": "(char_length(device_name) >= 1)"
+        },
+        {
+            "table": "devices",
+            "constraint": "2200_17745_9_not_null",
+            "definition": "updated_at IS NOT NULL"
+        },
+        {
+            "table": "devices",
+            "constraint": "2200_17745_8_not_null",
+            "definition": "registered_at IS NOT NULL"
+        },
+        {
+            "table": "devices",
+            "constraint": "2200_17745_7_not_null",
+            "definition": "is_active IS NOT NULL"
+        },
+        {
+            "table": "devices",
+            "constraint": "2200_17745_1_not_null",
+            "definition": "id IS NOT NULL"
+        },
+        {
+            "table": "devices",
+            "constraint": "2200_17745_2_not_null",
+            "definition": "user_id IS NOT NULL"
+        },
+        {
+            "table": "devices",
+            "constraint": "2200_17745_3_not_null",
+            "definition": "device_code IS NOT NULL"
+        },
+        {
+            "table": "devices",
+            "constraint": "2200_17745_5_not_null",
+            "definition": "device_token_hash IS NOT NULL"
+        },
+        {
+            "table": "notifications",
+            "constraint": "2200_17797_8_not_null",
+            "definition": "created_at IS NOT NULL"
+        },
+        {
+            "table": "notifications",
+            "constraint": "2200_17797_1_not_null",
+            "definition": "id IS NOT NULL"
+        },
+        {
+            "table": "notifications",
+            "constraint": "2200_17797_2_not_null",
+            "definition": "user_id IS NOT NULL"
+        },
+        {
+            "table": "notifications",
+            "constraint": "2200_17797_4_not_null",
+            "definition": "type IS NOT NULL"
+        },
+        {
+            "table": "notifications",
+            "constraint": "2200_17797_5_not_null",
+            "definition": "title IS NOT NULL"
+        },
+        {
+            "table": "notifications",
+            "constraint": "2200_17797_6_not_null",
+            "definition": "message IS NOT NULL"
+        },
+        {
+            "table": "notifications",
+            "constraint": "2200_17797_7_not_null",
+            "definition": "is_read IS NOT NULL"
+        },
+        {
+            "table": "sensor_readings",
+            "constraint": "sensor_readings_latitude_check",
+            "definition": "((latitude IS NULL) OR ((latitude >= ('-90'::integer)::numeric) AND (latitude <= (90)::numeric)))"
+        },
+        {
+            "table": "sensor_readings",
+            "constraint": "2200_17780_1_not_null",
+            "definition": "id IS NOT NULL"
+        },
+        {
+            "table": "sensor_readings",
+            "constraint": "2200_17780_2_not_null",
+            "definition": "device_id IS NOT NULL"
+        },
+        {
+            "table": "sensor_readings",
+            "constraint": "2200_17780_3_not_null",
+            "definition": "water_level IS NOT NULL"
+        },
+        {
+            "table": "sensor_readings",
+            "constraint": "2200_17780_6_not_null",
+            "definition": "is_flood_detected IS NOT NULL"
+        },
+        {
+            "table": "sensor_readings",
+            "constraint": "2200_17780_9_not_null",
+            "definition": "recorded_at IS NOT NULL"
+        },
+        {
+            "table": "sensor_readings",
+            "constraint": "sensor_readings_water_level_check",
+            "definition": "(water_level >= (0)::numeric)"
+        },
+        {
+            "table": "sensor_readings",
+            "constraint": "sensor_readings_longitude_check",
+            "definition": "((longitude IS NULL) OR ((longitude >= ('-180'::integer)::numeric) AND (longitude <= (180)::numeric)))"
+        },
+        {
+            "table": "sensor_readings",
+            "constraint": "sensor_readings_battery_check",
+            "definition": "((battery_level IS NULL) OR ((battery_level >= (0)::numeric) AND (battery_level <= (100)::numeric)))"
+        },
+        {
+            "table": "user_profiles",
+            "constraint": "2200_17536_2_not_null",
+            "definition": "name IS NOT NULL"
+        },
+        {
+            "table": "user_profiles",
+            "constraint": "2200_17536_1_not_null",
+            "definition": "id IS NOT NULL"
+        },
+        {
+            "table": "user_profiles",
+            "constraint": "2200_17536_5_not_null",
+            "definition": "updated_at IS NOT NULL"
+        },
+        {
+            "table": "user_profiles",
+            "constraint": "2200_17536_4_not_null",
+            "definition": "created_at IS NOT NULL"
+        }
+    ],
+    "unique_constraints": [
+        {
+            "table": "devices",
+            "columns": [
+                "device_code"
+            ],
+            "constraint": "devices_device_code_key"
+        }
+    ]
 }
