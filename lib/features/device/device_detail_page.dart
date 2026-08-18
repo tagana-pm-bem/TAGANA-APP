@@ -8,10 +8,12 @@ import '../../core/theme/app_spacing.dart';
 class DeviceDetailPage extends StatelessWidget {
   const DeviceDetailPage({
     required this.deviceId,
+    this.isOnline = true,
     super.key,
   });
 
   final String deviceId;
+  final bool isOnline;
 
   @override
   Widget build(BuildContext context) {
@@ -141,28 +143,31 @@ class DeviceDetailPage extends StatelessWidget {
                   ],
                 ),
                 Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.success,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(color: Color(0x8010B981), blurRadius: 4),
-                        ],
-                      ),
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: isOnline ? AppColors.success : AppColors.destructive,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: isOnline ? const Color(0x8010B981) : const Color(0x80EF4444),
+                          blurRadius: 4,
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Terhubung',
-                      style: textTheme.labelSmall?.copyWith(
-                        color: AppColors.success,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isOnline ? 'Terhubung' : 'Offline',
+                    style: textTheme.labelSmall?.copyWith(
+                      color: isOnline ? AppColors.success : AppColors.destructive,
+                      fontWeight: FontWeight.bold,
                     ),
-                  ],
-                ),
+                  ),
+                ],
+              ),
               ],
             ),
           ),
@@ -524,13 +529,64 @@ class DeviceDetailPage extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (!isOnline) ..._buildOfflineBanner(context, textTheme),
         _buildEmergencyBtn(context),
         const SizedBox(height: AppSpacing.sm),
-        _buildTestConnectionBtn(),
+        _buildTestConnectionBtn(context),
         const SizedBox(height: AppSpacing.sm),
         _buildCalibrateBtn(),
       ],
     );
+  }
+
+  List<Widget> _buildOfflineBanner(BuildContext context, TextTheme textTheme) {
+    return [
+      Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF1F0),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.destructive.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          children: [
+            const Icon(LucideIcons.wifiOff, color: AppColors.destructive, size: 20),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Perangkat Offline',
+                    style: textTheme.labelMedium?.copyWith(
+                      color: AppColors.destructive,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'Perangkat belum terhubung ke internet.',
+                    style: textTheme.bodySmall?.copyWith(color: AppColors.destructive.withValues(alpha: 0.8)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: AppSpacing.sm),
+      ElevatedButton.icon(
+        onPressed: () => context.push('/device/$deviceId/wifi-config'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.destructive,
+          foregroundColor: AppColors.destructiveForeground,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        icon: const Icon(LucideIcons.wifi, size: 18),
+        label: const Text('Hubungkan ke Internet', style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+      const SizedBox(height: AppSpacing.sm),
+    ];
   }
 
   Widget _buildEmergencyBtn(BuildContext context) {
@@ -547,9 +603,9 @@ class DeviceDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _buildTestConnectionBtn() {
+  Widget _buildTestConnectionBtn(BuildContext context) {
     return ElevatedButton.icon(
-      onPressed: () {},
+      onPressed: () => context.push('/device/$deviceId/test-connection'),
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.primaryForeground,

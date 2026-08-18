@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../../core/widgets/app_header.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -14,6 +16,12 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   bool _criticalAlertsEnabled = true;
   bool _deviceNotifsEnabled = false;
+
+  // Dummy user data – replace with real data source later
+  final String _userName = 'Yudha';
+  final String _userEmail = 'yudha@example.com';
+  final String _userAvatarUrl =
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuA3Kja-5loOn0yDsu4GJ_va683woaMvhMwz_WkBVgbgYZu_VIxqDsgmCBq2Vl3aYn7NY4O2TfclqE2xloEi5eMOxpMnoAgqkUqPabJA-ynTisg8EpiKAivdLV2gMruY266b0NcxhHSB2JO_5mTwDKywkCXheWc8eSfdj5ffcku4V0kRLBroO30ESGYhGkc5Pt-MzSNctTpKwmzsh6ledJ00OOixr-90xJFDL19RDAsLRi53PrR2dt6J';
 
   @override
   Widget build(BuildContext context) {
@@ -62,17 +70,20 @@ class _SettingsPageState extends State<SettingsPage> {
                   textTheme,
                   icon: LucideIcons.user,
                   title: 'Profil',
+                  onTap: () => context.push('/settings/profile'),
                 ),
                 _buildSettingsItem(
                   textTheme,
                   icon: LucideIcons.phone,
                   title: 'Nomor Telepon',
+                  onTap: () => context.push('/settings/phone'),
                 ),
                 _buildSettingsItem(
                   textTheme,
                   icon: LucideIcons.edit3,
                   title: 'Edit Profil',
                   showBorder: false,
+                  onTap: () => context.push('/settings/edit-profile'),
                 ),
               ],
             ),
@@ -119,11 +130,13 @@ class _SettingsPageState extends State<SettingsPage> {
                   textTheme,
                   icon: LucideIcons.helpCircle,
                   title: 'Pusat Bantuan',
+                  onTap: () => context.push('/settings/help'),
                 ),
                 _buildSettingsItem(
                   textTheme,
                   icon: LucideIcons.info,
                   title: 'Tentang TAGANA',
+                  onTap: () => context.push('/settings/about'),
                 ),
                 _buildSettingsItem(
                   textTheme,
@@ -164,24 +177,23 @@ class _SettingsPageState extends State<SettingsPage> {
         children: [
           Row(
             children: [
-              const CircleAvatar(
+              CircleAvatar(
                 radius: 32,
-                backgroundImage: NetworkImage(
-                    'https://lh3.googleusercontent.com/aida-public/AB6AXuA3Kja-5loOn0yDsu4GJ_va683woaMvhMwz_WkBVgbgYZu_VIxqDsgmCBq2Vl3aYn7NY4O2TfclqE2xloEi5eMOxpMnoAgqkUqPabJA-ynTisg8EpiKAivdLV2gMruY266b0NcxhHSB2JO_5mTwDKywkCXheWc8eSfdj5ffcku4V0kRLBroO30ESGYhGkc5Pt-MzSNctTpKwmzsh6ledJ00OOixr-90xJFDL19RDAsLRi53PrR2dt6J'),
+                backgroundImage: NetworkImage(_userAvatarUrl),
               ),
               const SizedBox(width: AppSpacing.md),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Yudha',
+                    _userName,
                     style: textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: AppColors.foreground,
                     ),
                   ),
                   Text(
-                    '08xxxxxxxxxx',
+                    _userEmail,
                     style: textTheme.bodyMedium?.copyWith(
                       color: AppColors.mutedForeground,
                     ),
@@ -256,9 +268,10 @@ class _SettingsPageState extends State<SettingsPage> {
     required String title,
     String? trailingText,
     bool showBorder = true,
+    VoidCallback? onTap,
   }) {
     return InkWell(
-      onTap: () {},
+      onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(

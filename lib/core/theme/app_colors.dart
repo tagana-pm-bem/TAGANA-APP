@@ -33,6 +33,9 @@ abstract final class AppColors {
  
   static const destructive = Color(0xFFDC2626);
   static const destructiveForeground = Color(0xFFFFFFFF);
+  static const onPrimary = primaryForeground;
+  static const onSurfaceVariant = mutedForeground;
+  static const outlineVariant = Color(0xFFE0E0E0);
  
   static const navyLight = Color(0xFFe8eef7);
   static const navy = Color(0xFF1E2A4A);

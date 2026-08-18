@@ -262,12 +262,10 @@ class DevicesPage extends StatelessWidget {
     required bool isConnected,
     bool isWarning = false,
   }) {
-    return Opacity(
-      opacity: isConnected ? 1.0 : 0.6,
-      child: InkWell(
-        onTap: () => context.push('/device/$name'),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
+    return InkWell(
+      onTap: () => context.push('/device/$name', extra: isConnected),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
             color: isWarning ? Colors.red.shade50 : AppColors.card,
@@ -382,7 +380,6 @@ class DevicesPage extends StatelessWidget {
               ),
             ],
           ),
-        ),
       ),
     );
   }

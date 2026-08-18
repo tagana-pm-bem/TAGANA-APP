@@ -5,12 +5,19 @@ import '../../features/dashboard/dashboard_page.dart';
 import '../../features/device/ble_connect_page.dart';
 import '../../features/device/device_detail_page.dart';
 import '../../features/device/devices_page.dart';
+import '../../features/device/test_connection_page.dart';
 import '../../features/device/emergency_page.dart';
 import '../../features/device/hotspot_page.dart';
+import '../../features/device/wifi_config_page.dart';
 import '../../features/history/history_page.dart';
 import '../../features/map/map_page.dart';
 import '../../features/onboarding/splash_page.dart';
 import '../../features/settings/settings_page.dart';
+import '../../features/settings/pages/profile_page.dart';
+import '../../features/settings/pages/phone_page.dart';
+import '../../features/settings/pages/edit_profile_page.dart';
+import '../../features/settings/pages/help_page.dart';
+import '../../features/settings/pages/about_page.dart';
 import '../../features/onboarding/welcome_page.dart';
 import '../../features/onboarding/register.dart';
 import '../../features/onboarding/enter_device.dart';
@@ -20,7 +27,8 @@ import '../../features/onboarding/connection_success.dart';
 import 'app_shell.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
-final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>();
+final GlobalKey<NavigatorState> _shellNavigatorKey =
+    GlobalKey<NavigatorState>();
 
 final appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
@@ -57,17 +65,13 @@ final appRouter = GoRouter(
         // simulate a connected device (useful for demo/dev builds).
         if (auto) {
           // schedule navigation after the current microtask so builder can finish
-          Future.microtask(
-            () => context.go('/connection-success/$deviceCode'),
-          );
+          Future.microtask(() => context.go('/connection-success/$deviceCode'));
         }
 
         return BluetoothConnectionPage(
           deviceNamePrefix: 'TAGANA',
-          onConnected: (info) => context.go(
-            '/connection-success/${info.deviceId}',
-            extra: info,
-          ),
+          onConnected: (info) =>
+              context.go('/connection-success/${info.deviceId}', extra: info),
         );
       },
     ),
@@ -105,10 +109,7 @@ final appRouter = GoRouter(
           path: '/devices',
           builder: (context, state) => const DevicesPage(),
         ),
-        GoRoute(
-          path: '/map',
-          builder: (context, state) => const MapPage(),
-        ),
+        GoRoute(path: '/map', builder: (context, state) => const MapPage()),
         GoRoute(
           path: '/history',
           builder: (context, state) => const HistoryPage(),
@@ -121,11 +122,45 @@ final appRouter = GoRouter(
     ),
 
     // Detail pages outside the shell (hides bottom nav)
+    // Settings detail routes (no bottom navigation)
+    GoRoute(
+      path: '/settings/profile',
+      pageBuilder: (context, state) =>
+          NoTransitionPage(child: const ProfilePage()),
+    ),
+    GoRoute(
+      path: '/settings/phone',
+      pageBuilder: (context, state) =>
+          NoTransitionPage(child: const PhonePage()),
+    ),
+    GoRoute(
+      path: '/settings/edit-profile',
+      pageBuilder: (context, state) =>
+          NoTransitionPage(child: const EditProfilePage()),
+    ),
+    GoRoute(
+      path: '/settings/help',
+      pageBuilder: (context, state) =>
+          NoTransitionPage(child: const HelpPage()),
+    ),
+    GoRoute(
+      path: '/settings/about',
+      pageBuilder: (context, state) =>
+          NoTransitionPage(child: const AboutPage()),
+    ),
     GoRoute(
       path: '/device/:id',
       builder: (context, state) {
         final deviceId = state.pathParameters['id']!;
-        return DeviceDetailPage(deviceId: deviceId);
+        final isOnline = state.extra is bool ? state.extra as bool : true;
+        return DeviceDetailPage(deviceId: deviceId, isOnline: isOnline);
+      },
+    ),
+    GoRoute(
+      path: '/device/:id/test-connection',
+      builder: (context, state) {
+        final deviceId = state.pathParameters['id']!;
+        return TestConnectionPage(deviceId: deviceId);
       },
     ),
     GoRoute(
@@ -149,5 +184,12 @@ final appRouter = GoRouter(
         return BleConnectPage(deviceId: deviceId);
       },
     ),
+    GoRoute(
+      path: '/device/:id/wifi-config',
+      builder: (context, state) {
+        final deviceId = state.pathParameters['id']!;
+        return WifiConfigPage(deviceId: deviceId);
+      },
+    ),
   ],
-);
+);
