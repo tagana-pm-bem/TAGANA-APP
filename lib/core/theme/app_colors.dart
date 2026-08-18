@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 
 abstract final class AppColors {
   // Brand
- static const primary = Color(0xFF6366F1);
+  static const primary = Color(0xFF6366F1);
   static const primaryForeground = Color(0xFFFFFFFF);
+  static const primaryContainer = Color(0xFFE0E7FF);
  
   // Base
   static const background = Color(0xFFFAFAFA);

@@ -1,7 +1,12 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/dashboard/dashboard_page.dart';
+import '../../features/device/ble_connect_page.dart';
 import '../../features/device/device_detail_page.dart';
+import '../../features/device/devices_page.dart';
+import '../../features/device/emergency_page.dart';
+import '../../features/device/hotspot_page.dart';
 import '../../features/history/history_page.dart';
 import '../../features/map/map_page.dart';
 import '../../features/onboarding/splash_page.dart';
@@ -12,8 +17,13 @@ import '../../features/onboarding/enter_device.dart';
 import '../../features/onboarding/verifying_device.dart';
 import '../../features/onboarding/bluetooth_connection.dart';
 import '../../features/onboarding/connection_success.dart';
+import 'app_shell.dart';
+
+final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
+final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>();
 
 final appRouter = GoRouter(
+  navigatorKey: _rootNavigatorKey,
   initialLocation: '/splash',
   routes: [
     GoRoute(path: '/splash', builder: (context, state) => const SplashPage()),
@@ -79,27 +89,65 @@ final appRouter = GoRouter(
         );
       },
     ),
-    GoRoute(
-      path: '/dashboard',
-      builder: (context, state) => const DashboardPage(),
+
+    // ShellRoute for main app navigation with bottom bar
+    ShellRoute(
+      navigatorKey: _shellNavigatorKey,
+      builder: (context, state, child) {
+        return AppShell(child: child);
+      },
+      routes: [
+        GoRoute(
+          path: '/dashboard',
+          builder: (context, state) => const DashboardPage(),
+        ),
+        GoRoute(
+          path: '/devices',
+          builder: (context, state) => const DevicesPage(),
+        ),
+        GoRoute(
+          path: '/map',
+          builder: (context, state) => const MapPage(),
+        ),
+        GoRoute(
+          path: '/history',
+          builder: (context, state) => const HistoryPage(),
+        ),
+        GoRoute(
+          path: '/settings',
+          builder: (context, state) => const SettingsPage(),
+        ),
+      ],
     ),
 
-    GoRoute(path: '/map', builder: (context, state) => const MapPage()),
-
-    GoRoute(path: '/history', builder: (context, state) => const HistoryPage()),
-
-    GoRoute(
-      path: '/settings',
-      builder: (context, state) => const SettingsPage(),
-    ),
-
+    // Detail pages outside the shell (hides bottom nav)
     GoRoute(
       path: '/device/:id',
       builder: (context, state) {
         final deviceId = state.pathParameters['id']!;
-
         return DeviceDetailPage(deviceId: deviceId);
       },
     ),
+    GoRoute(
+      path: '/device/:id/emergency',
+      builder: (context, state) {
+        final deviceId = state.pathParameters['id']!;
+        return EmergencyPage(deviceId: deviceId);
+      },
+    ),
+    GoRoute(
+      path: '/device/:id/hotspot',
+      builder: (context, state) {
+        final deviceId = state.pathParameters['id']!;
+        return HotspotPage(deviceId: deviceId);
+      },
+    ),
+    GoRoute(
+      path: '/device/:id/ble',
+      builder: (context, state) {
+        final deviceId = state.pathParameters['id']!;
+        return BleConnectPage(deviceId: deviceId);
+      },
+    ),
   ],
-);
+);
