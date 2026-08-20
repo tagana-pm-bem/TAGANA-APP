@@ -164,9 +164,9 @@ class _VerifyingDevicePageState extends State<EnterDevicePage> {
         fillColor = AppColors.input;
         break;
       case _DeviceCodeStatus.invalid:
-        borderColor = AppColors.destructiveForeground;
+        borderColor = AppColors.destructive;
         borderWidth = 2;
-        fillColor = AppColors.destructive;
+        fillColor = AppColors.input;
         break;
       case _DeviceCodeStatus.empty:
         borderColor = AppColors.border;
@@ -258,7 +258,7 @@ class _VerifyingDevicePageState extends State<EnterDevicePage> {
                 child: Text(
                   'Kode perangkat tidak valid.',
                   style: TextStyle(
-                    color: AppColors.destructiveForeground,
+                    color: AppColors.destructive,
                     fontSize: 11,
                   ),
                 ),

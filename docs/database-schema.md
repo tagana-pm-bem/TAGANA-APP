@@ -13,7 +13,6 @@ Additional profile information for Supabase Auth users.
 | `updated_at` | `timestamptz` |  |
 
 ## Table `device_locations`
-
 Historical GPS locations reported by TAGANA devices.
 
 ### Columns

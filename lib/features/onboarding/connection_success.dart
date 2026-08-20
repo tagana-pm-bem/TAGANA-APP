@@ -274,7 +274,7 @@ class _DeviceCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.navy,
+        color: AppColors.primary,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -488,7 +488,7 @@ class _ContinueButton extends StatelessWidget {
         child: ElevatedButton(
           onPressed: onPressed,
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.navy,
+            backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
