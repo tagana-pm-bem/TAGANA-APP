@@ -1,9 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_spacing.dart';
+// Definisi warna berdasarkan Tailwind config dari HTML
+class _HtmlColors {
+  static const surface = Color(0xFFF9F9F9);
+  static const onSurface = Color(0xFF1A1C1C);
+  static const onSurfaceVariant = Color(0xFF464554);
+  static const primary = Color(0xFF4648D4);
+  static const primaryContainer = Color(0xFF6063EE);
+  static const surfaceContainerLow = Color(0xFFF3F3F3);
+  static const surfaceContainerLowest = Color(0xFFFFFFFF);
+  static const surfaceVariant = Color(0xFFE2E2E2);
+  static const outlineVariant = Color(0xFFC7C4D7);
+  static const secondary = Color(0xFF5D5F5F);
+  static const surfaceContainer = Color(0xFFEEEEEE);
+  static const surfaceContainerHigh = Color(0xFFE8E8E8);
+}
 
 class WifiConfigPage extends StatefulWidget {
   const WifiConfigPage({required this.deviceId, super.key});
@@ -15,169 +27,163 @@ class WifiConfigPage extends StatefulWidget {
 }
 
 class _WifiConfigPageState extends State<WifiConfigPage> {
-  bool _isRefreshing = false;
+  final TextEditingController _ssidController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _obscurePassword = true;
+  bool _isConnecting = false;
 
-  // Dummy available networks
-  final List<_WifiNetwork> _networks = const [
-    _WifiNetwork(ssid: 'TAGANA Office', signal: _SignalStrength.good, isOpen: false),
-    _WifiNetwork(ssid: 'Universitas Network', signal: _SignalStrength.medium, isOpen: false),
-    _WifiNetwork(ssid: 'Guest Network', signal: _SignalStrength.weak, isOpen: true),
-  ];
+  @override
+  void dispose() {
+    _ssidController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
-  Future<void> _handleRefresh() async {
-    setState(() => _isRefreshing = true);
-    await Future.delayed(const Duration(seconds: 1));
-    if (mounted) setState(() => _isRefreshing = false);
+  void _handleConnect() async {
+    if (_ssidController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('SSID dan Password harus diisi')),
+      );
+      return;
+    }
+
+    // Navigasi langsung ke halaman proses menghubungkan
+    if (mounted) {
+      setState(() => _isConnecting = false);
+      context.push('/device/${widget.deviceId}/wifi-connecting?ssid=${Uri.encodeComponent(_ssidController.text)}');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: _buildAppBar(context, textTheme),
+      backgroundColor: _HtmlColors.surface,
+      appBar: _buildAppBar(context),
       body: Stack(
         children: [
           SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.lg,
-              AppSpacing.md,
-              140,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Device context card
-                _buildDeviceContext(textTheme),
-                const SizedBox(height: AppSpacing.lg),
-
-                // Wi-Fi status section
-                _buildSectionLabel(textTheme, 'Status Wi-Fi Saat Ini'),
-                const SizedBox(height: AppSpacing.sm),
-                _buildWifiStatusCard(textTheme),
-                const SizedBox(height: AppSpacing.lg),
-
-                // Available networks
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildSectionLabel(textTheme, 'Jaringan Wi-Fi Tersedia'),
-                    GestureDetector(
-                      onTap: _handleRefresh,
-                      child: Row(
-                        children: [
-                          _isRefreshing
-                              ? const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(strokeWidth: 1.5),
-                                )
-                              : const Icon(LucideIcons.refreshCw, size: 14, color: AppColors.primary),
-                          const SizedBox(width: 4),
-                          Text('Refresh', style: textTheme.labelSmall?.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.sm),
-
-                // Network list
-                ...List.generate(_networks.length, (i) {
-                  return Padding(
-                    padding: EdgeInsets.only(bottom: i < _networks.length - 1 ? AppSpacing.sm : 0),
-                    child: _buildNetworkItem(context, textTheme, _networks[i]),
-                  );
-                }),
-
-                const SizedBox(height: AppSpacing.lg),
-
-                // Manual entry
-                _buildManualEntryButton(context, textTheme),
+                _buildDeviceContext(),
+                const SizedBox(height: 24.0),
+                _buildSectionLabel('STATUS WI-FI SAAT INI'),
+                const SizedBox(height: 8.0),
+                _buildWifiStatusCard(),
+                const SizedBox(height: 24.0),
+                _buildSectionLabel('KONFIGURASI JARINGAN'),
+                const SizedBox(height: 12.0),
+                _buildConfigurationForm(),
+                const SizedBox(height: 120.0), // Padding untuk banner bawah
               ],
             ),
           ),
-
-          // Fixed bottom info banner
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: _buildInfoBanner(textTheme),
+            child: _buildEmergencyBanner(),
           ),
         ],
       ),
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context, TextTheme textTheme) {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
-      backgroundColor: AppColors.background,
+      backgroundColor: _HtmlColors.surface,
       elevation: 0,
       scrolledUnderElevation: 1,
+      shadowColor: Colors.black.withOpacity(0.1),
       leading: IconButton(
-        icon: const Icon(LucideIcons.arrowLeft),
-        color: AppColors.foreground,
+        icon: const Icon(Icons.arrow_back, color: _HtmlColors.onSurfaceVariant),
         onPressed: () => context.pop(),
       ),
-      title: Column(
+      title: const Column(
         children: [
           Text(
             'Konfigurasi Wi-Fi',
-            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: AppColors.foreground),
+            style: TextStyle(
+              fontFamily: 'Plus Jakarta Sans',
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: _HtmlColors.onSurface,
+            ),
           ),
           Text(
-            'Hubungkan perangkat TAGANA ke jaringan Wi-Fi',
-            style: textTheme.labelSmall?.copyWith(color: AppColors.mutedForeground),
+            'Hubungkan perangkat TAGANA ke internet',
+            style: TextStyle(
+              fontFamily: 'Plus Jakarta Sans',
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: _HtmlColors.onSurfaceVariant,
+            ),
           ),
         ],
       ),
       centerTitle: true,
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(1),
-        child: Container(height: 1, color: AppColors.border),
-      ),
     );
   }
 
-  Widget _buildDeviceContext(TextTheme textTheme) {
+  Widget _buildDeviceContext() {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(12),
-        border: Border(left: BorderSide(color: AppColors.primary, width: 4)),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4)),
+        color: _HtmlColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(8.0),
+        border: const Border(left: BorderSide(color: _HtmlColors.primary, width: 4.0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(30, 42, 74, 0.05),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8.0),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+              color: _HtmlColors.primaryContainer.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8.0),
             ),
-            child: const Icon(LucideIcons.router, color: AppColors.primary, size: 22),
+            child: const Icon(Icons.router, color: _HtmlColors.primary),
           ),
-          const SizedBox(width: AppSpacing.md),
+          const SizedBox(width: 16.0),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('DEVICE ID', style: textTheme.labelSmall?.copyWith(color: AppColors.mutedForeground, letterSpacing: 0.8)),
+              const Text(
+                'DEVICE ID',
+                style: TextStyle(
+                  fontFamily: 'Plus Jakarta Sans',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: _HtmlColors.onSurfaceVariant,
+                ),
+              ),
               Row(
                 children: [
                   Text(
                     widget.deviceId,
-                    style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: AppColors.foreground),
+                    style: const TextStyle(
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: _HtmlColors.onSurface,
+                    ),
                   ),
-                  const SizedBox(width: 6),
-                  Text(
+                  const SizedBox(width: 4.0),
+                  const Text(
                     '(TGN_0001)',
-                    style: textTheme.bodySmall?.copyWith(color: AppColors.mutedForeground),
+                    style: TextStyle(
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      color: _HtmlColors.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
@@ -188,136 +194,195 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
     );
   }
 
-  Widget _buildSectionLabel(TextTheme textTheme, String label) {
+  Widget _buildSectionLabel(String text) {
     return Text(
-      label.toUpperCase(),
-      style: textTheme.labelSmall?.copyWith(
-        color: AppColors.mutedForeground,
-        letterSpacing: 0.8,
+      text,
+      style: const TextStyle(
+        fontFamily: 'Plus Jakarta Sans',
+        fontSize: 12,
         fontWeight: FontWeight.w600,
+        color: _HtmlColors.onSurfaceVariant,
+        letterSpacing: 0.6,
       ),
     );
   }
 
-  Widget _buildWifiStatusCard(TextTheme textTheme) {
+  Widget _buildWifiStatusCard() {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4)),
+        color: _HtmlColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(8.0),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(30, 42, 74, 0.05),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
         ],
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.muted,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(LucideIcons.wifiOff, size: 22, color: AppColors.mutedForeground),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8.0),
+                decoration: BoxDecoration(
+                  color: _HtmlColors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+                child: const Icon(Icons.wifi_off, color: _HtmlColors.onSurfaceVariant),
+              ),
+              const SizedBox(width: 16.0),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Belum Terhubung',
+                    style: TextStyle(
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: _HtmlColors.onSurface,
+                    ),
+                  ),
+                  Text(
+                    'Perangkat sedang offline',
+                    style: TextStyle(
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      color: _HtmlColors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Belum Terhubung', style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, color: AppColors.foreground)),
-                Text('Perangkat sedang offline', style: textTheme.bodySmall?.copyWith(color: AppColors.mutedForeground)),
-              ],
-            ),
-          ),
-          const Icon(LucideIcons.info, size: 18, color: AppColors.mutedForeground),
+          const Icon(Icons.info_outline, color: _HtmlColors.outlineVariant),
         ],
       ),
     );
   }
 
-  Widget _buildNetworkItem(BuildContext context, TextTheme textTheme, _WifiNetwork network) {
-    return Material(
-      color: AppColors.card,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => _showPasswordDialog(context, textTheme, network),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Row(
-            children: [
-              _WifiSignalIcon(strength: network.signal),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(network.ssid, style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500, color: AppColors.foreground)),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Icon(
-                          network.isOpen ? LucideIcons.unlock : LucideIcons.lock,
-                          size: 12,
-                          color: network.isOpen ? AppColors.success : AppColors.mutedForeground,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          network.isOpen
-                              ? 'Terbuka • ${network.signal.label}'
-                              : network.signal.label,
-                          style: textTheme.labelSmall?.copyWith(color: AppColors.mutedForeground),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              OutlinedButton(
-                onPressed: () => _showPasswordDialog(context, textTheme, network),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  side: BorderSide(color: AppColors.border),
-                ),
-                child: Text('Pilih', style: textTheme.labelSmall?.copyWith(color: AppColors.foreground, fontWeight: FontWeight.w600)),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildManualEntryButton(BuildContext context, TextTheme textTheme) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: () => _showManualDialog(context, textTheme),
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          side: const BorderSide(color: AppColors.border),
-        ),
-        icon: const Icon(LucideIcons.plus, size: 18, color: AppColors.primary),
-        label: Text(
-          'Tambahkan jaringan secara manual',
-          style: textTheme.labelMedium?.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoBanner(TextTheme textTheme) {
+  Widget _buildConfigurationForm() {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(20.0),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: _HtmlColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12.0),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(30, 42, 74, 0.05),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Masukkan detail jaringan Wi-Fi dari provider Anda.',
+            style: TextStyle(
+              fontFamily: 'Plus Jakarta Sans',
+              fontSize: 14,
+              color: _HtmlColors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 20.0),
+          TextField(
+            controller: _ssidController,
+            decoration: InputDecoration(
+              labelText: 'Nama Jaringan (SSID)',
+              labelStyle: const TextStyle(color: _HtmlColors.onSurfaceVariant),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10.0),
+                borderSide: const BorderSide(color: _HtmlColors.outlineVariant),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10.0),
+                borderSide: const BorderSide(color: _HtmlColors.primary, width: 2.0),
+              ),
+              prefixIcon: const Icon(Icons.wifi, color: _HtmlColors.onSurfaceVariant),
+            ),
+          ),
+          const SizedBox(height: 16.0),
+          TextField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            decoration: InputDecoration(
+              labelText: 'Password',
+              labelStyle: const TextStyle(color: _HtmlColors.onSurfaceVariant),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10.0),
+                borderSide: const BorderSide(color: _HtmlColors.outlineVariant),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10.0),
+                borderSide: const BorderSide(color: _HtmlColors.primary, width: 2.0),
+              ),
+              prefixIcon: const Icon(Icons.lock_outline, color: _HtmlColors.onSurfaceVariant),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  color: _HtmlColors.onSurfaceVariant,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 24.0),
+          ElevatedButton(
+            onPressed: _isConnecting ? null : _handleConnect,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _HtmlColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16.0),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10.0),
+              ),
+              elevation: 0,
+            ),
+            child: _isConnecting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Text(
+                    'Hubungkan Perangkat',
+                    style: TextStyle(
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmergencyBanner() {
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      decoration: const BoxDecoration(
+        color: _HtmlColors.surfaceContainer,
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 32, offset: const Offset(0, -10)),
+          BoxShadow(
+            color: Color.fromRGBO(30, 42, 74, 0.05),
+            blurRadius: 32,
+            offset: Offset(0, -10),
+          ),
         ],
       ),
       child: SafeArea(
@@ -325,169 +390,25 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(LucideIcons.info, size: 16, color: AppColors.mutedForeground),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
+            const Padding(
+              padding: EdgeInsets.only(top: 4.0),
+              child: Icon(Icons.info_outline, size: 20, color: _HtmlColors.secondary),
+            ),
+            const SizedBox(width: 8.0),
+            const Expanded(
               child: Text(
                 'Wi-Fi adalah koneksi utama. Jika tidak tersedia saat darurat, perangkat akan otomatis menggunakan BLE atau Hotspot.',
-                style: textTheme.bodySmall?.copyWith(color: AppColors.mutedForeground),
+                style: TextStyle(
+                  fontFamily: 'Plus Jakarta Sans',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: _HtmlColors.secondary,
+                ),
               ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  void _showPasswordDialog(BuildContext context, TextTheme textTheme, _WifiNetwork network) {
-    final ctrl = TextEditingController();
-    bool obscure = true;
-
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Hubungkan ke "${network.ssid}"', style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-          content: network.isOpen
-              ? Text('Jaringan ini terbuka. Lanjutkan koneksi?', style: textTheme.bodyMedium)
-              : TextField(
-                  controller: ctrl,
-                  obscureText: obscure,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                    suffixIcon: IconButton(
-                      icon: Icon(obscure ? LucideIcons.eyeOff : LucideIcons.eye, size: 18),
-                      onPressed: () => setS(() => obscure = !obscure),
-                    ),
-                  ),
-                ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _showConnectingSnackbar(context, network.ssid);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.primaryForeground,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: const Text('Hubungkan'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showManualDialog(BuildContext context, TextTheme textTheme) {
-    final ssidCtrl = TextEditingController();
-    final passCtrl = TextEditingController();
-    bool obscure = true;
-
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Tambah Jaringan Manual', style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: ssidCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Nama Jaringan (SSID)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: passCtrl,
-                obscureText: obscure,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  suffixIcon: IconButton(
-                    icon: Icon(obscure ? LucideIcons.eyeOff : LucideIcons.eye, size: 18),
-                    onPressed: () => setS(() => obscure = !obscure),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                if (ssidCtrl.text.isNotEmpty) _showConnectingSnackbar(context, ssidCtrl.text);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.primaryForeground,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: const Text('Hubungkan'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showConnectingSnackbar(BuildContext context, String ssid) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Menghubungkan ke "$ssid"...'),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-}
-
-// ─── Data models ───────────────────────────────────────────────────────────────
-
-enum _SignalStrength {
-  good('Signal Good'),
-  medium('Signal Medium'),
-  weak('Signal Weak');
-
-  const _SignalStrength(this.label);
-  final String label;
-}
-
-class _WifiNetwork {
-  const _WifiNetwork({required this.ssid, required this.signal, required this.isOpen});
-  final String ssid;
-  final _SignalStrength signal;
-  final bool isOpen;
-}
-
-class _WifiSignalIcon extends StatelessWidget {
-  const _WifiSignalIcon({required this.strength});
-  final _SignalStrength strength;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color color;
-    final IconData icon;
-    switch (strength) {
-      case _SignalStrength.good:
-        color = AppColors.foreground;
-        icon = LucideIcons.wifi;
-      case _SignalStrength.medium:
-        color = AppColors.mutedForeground;
-        icon = LucideIcons.wifi;
-      case _SignalStrength.weak:
-        color = AppColors.mutedForeground.withValues(alpha: 0.6);
-        icon = LucideIcons.wifi;
-    }
-    return Icon(icon, color: color, size: 22);
   }
 }

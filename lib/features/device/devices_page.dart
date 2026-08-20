@@ -281,103 +281,123 @@ class DevicesPage extends StatelessWidget {
               ),
             ],
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: isWarning
-                          ? Colors.red.shade100
-                          : (isConnected ? Colors.indigo.shade50 : AppColors.muted),
-                      borderRadius: BorderRadius.circular(20), // Fully rounded as per HTML
-                    ),
-                    child: Icon(
-                      icon,
-                      color: isWarning
-                          ? AppColors.destructive
-                          : (isConnected ? AppColors.primary : AppColors.mutedForeground),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
                     children: [
-                      Text(
-                        name,
-                        style: textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.foreground,
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: isWarning
+                              ? Colors.red.shade100
+                              : (isConnected ? Colors.indigo.shade50 : AppColors.muted),
+                          borderRadius: BorderRadius.circular(20), // Fully rounded as per HTML
+                        ),
+                        child: Icon(
+                          icon,
+                          color: isWarning
+                              ? AppColors.destructive
+                              : (isConnected ? AppColors.primary : AppColors.mutedForeground),
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        code,
-                        style: textTheme.labelSmall?.copyWith(
-                          color: AppColors.mutedForeground,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
+                      const SizedBox(width: AppSpacing.md),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (isConnected) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.green.shade100,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                'Terhubung',
-                                style: textTheme.labelSmall?.copyWith(
-                                  fontSize: 10,
-                                  color: Colors.green.shade800,
+                          Text(
+                            name,
+                            style: textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.foreground,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            code,
+                            style: textTheme.labelSmall?.copyWith(
+                              color: AppColors.mutedForeground,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              if (isConnected) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.shade100,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    'Terhubung',
+                                    style: textTheme.labelSmall?.copyWith(
+                                      fontSize: 10,
+                                      color: Colors.green.shade800,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                              ],
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isWarning ? Colors.red.shade100 : AppColors.muted,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  statusText,
+                                  style: textTheme.labelSmall?.copyWith(
+                                    fontSize: 10,
+                                    color: isWarning ? AppColors.destructive : AppColors.mutedForeground,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 4),
-                          ],
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isWarning ? Colors.red.shade100 : AppColors.muted,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              statusText,
-                              style: textTheme.labelSmall?.copyWith(
-                                fontSize: 10,
-                                color: isWarning ? AppColors.destructive : AppColors.mutedForeground,
-                              ),
-                            ),
+                            ],
                           ),
                         ],
                       ),
                     ],
                   ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        timeAgo,
+                        style: textTheme.labelSmall?.copyWith(
+                          fontSize: 10,
+                          color: isWarning ? AppColors.destructive : AppColors.mutedForeground,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Icon(
+                        LucideIcons.chevronRight,
+                        color: AppColors.mutedForeground,
+                        size: 20,
+                      ),
+                    ],
+                  ),
                 ],
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    timeAgo,
-                    style: textTheme.labelSmall?.copyWith(
-                      fontSize: 10,
-                      color: isWarning ? AppColors.destructive : AppColors.mutedForeground,
-                    ),
+              if (!isConnected) ...[
+                const SizedBox(height: AppSpacing.md),
+                ElevatedButton.icon(
+                  onPressed: () => context.push('/device/$name/wifi-config'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.destructive,
+                    foregroundColor: AppColors.destructiveForeground,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  const SizedBox(height: 8),
-                  Icon(
-                    LucideIcons.chevronRight,
-                    color: AppColors.mutedForeground,
-                    size: 20,
-                  ),
-                ],
-              ),
+                  icon: const Icon(LucideIcons.wifi, size: 16),
+                  label: const Text('Hubungkan ke Internet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                ),
+              ],
             ],
           ),
       ),

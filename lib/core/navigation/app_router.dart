@@ -9,6 +9,8 @@ import '../../features/device/test_connection_page.dart';
 import '../../features/device/emergency_page.dart';
 import '../../features/device/hotspot_page.dart';
 import '../../features/device/wifi_config_page.dart';
+import '../../features/device/wifi_connecting_page.dart';
+import '../../features/device/wifi_connected_page.dart';
 import '../../features/history/history_page.dart';
 import '../../features/map/map_page.dart';
 import '../../features/onboarding/splash_page.dart';
@@ -189,6 +191,22 @@ final appRouter = GoRouter(
       builder: (context, state) {
         final deviceId = state.pathParameters['id']!;
         return WifiConfigPage(deviceId: deviceId);
+      },
+    ),
+    GoRoute(
+      path: '/device/:id/wifi-connecting',
+      builder: (context, state) {
+        final deviceId = state.pathParameters['id']!;
+        final ssid = state.uri.queryParameters['ssid'] ?? '';
+        return WifiConnectingPage(deviceId: deviceId, ssid: ssid);
+      },
+    ),
+    GoRoute(
+      path: '/device/:id/wifi-connected',
+      builder: (context, state) {
+        final deviceId = state.pathParameters['id']!;
+        final ssid = state.uri.queryParameters['ssid'] ?? '';
+        return WifiConnectedPage(deviceId: deviceId, ssid: ssid);
       },
     ),
   ],
