@@ -12,26 +12,27 @@ class UserRepository {
   }) async {
     final normalizedPhone = _normalizePhone(phone);
 
-    final existing = await _client
+    try {
+      await _client.functions.invoke(
+        'register-user',
+        body: {
+          'name': name.trim(),
+          'phone': normalizedPhone,
+        },
+      );
+    } catch (e) {
+      throw Exception('Gagal mendaftar: $e');
+    }
+
+    final response = await _client
         .from('user_profiles')
         .select()
         .eq('phone', normalizedPhone)
         .maybeSingle();
 
-    if (existing != null) {
-      throw Exception(
-        'Nomor telepon sudah terdaftar.',
-      );
+    if (response == null) {
+      throw Exception('Gagal mendapatkan profil pengguna.');
     }
-
-    final response = await _client
-        .from('user_profiles')
-        .insert({
-          'name': name.trim(),
-          'phone': normalizedPhone,
-        })
-        .select()
-        .single();
 
     return UserProfile.fromJson(response);
   }

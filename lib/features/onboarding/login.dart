@@ -4,46 +4,46 @@ import 'package:go_router/go_router.dart';
 
 import 'package:tagana_app/features/auth/data/user_repository.dart';
 
-class RegisterPage extends StatefulWidget {
-  const RegisterPage({super.key});
+class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
 
   @override
-  State<RegisterPage> createState() => _RegisterWhatsAppPageState();
+  State<LoginPage> createState() => _LoginPageState();
 }
 
-class _RegisterWhatsAppPageState extends State<RegisterPage> {
-  final _nameController = TextEditingController();
+class _LoginPageState extends State<LoginPage> {
   final _phoneController = TextEditingController();
-  bool _agreed = false;
   bool _isLoading = false;
 
   bool get _isPhoneValid => _phoneController.text.trim().length >= 9;
 
-  bool get _canSubmit =>
-      _nameController.text.trim().isNotEmpty && _isPhoneValid && _agreed;
-
   @override
   void dispose() {
-    _nameController.dispose();
     _phoneController.dispose();
     super.dispose();
   }
 
   void _onSubmit() async {
-    if (!_canSubmit) return;
-    
+    if (!_isPhoneValid) return;
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      await UserRepository.register(
-        name: _nameController.text,
+      final user = await UserRepository.login(
         phone: _phoneController.text,
       );
 
       if (!mounted) return;
-      context.go('/enter-device');
+
+      if (user != null) {
+        context.go('/dashboard');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Akun tidak ditemukan. Silakan daftar terlebih dahulu.')),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -77,17 +77,13 @@ class _RegisterWhatsAppPageState extends State<RegisterPage> {
                   children: [
                     _buildIntro(),
                     const SizedBox(height: 28),
-                    _buildNameField(),
-                    const SizedBox(height: 20),
                     _buildPhoneField(),
                     const SizedBox(height: 28),
                     _buildInfoBox(),
                     const SizedBox(height: 24),
-                    _buildAgreement(),
-                    const SizedBox(height: 24),
                     _buildSubmitButton(),
                     const SizedBox(height: 16),
-                    _buildLoginLink(),
+                    _buildRegisterLink(),
                   ],
                 ),
               ),
@@ -111,7 +107,13 @@ class _RegisterWhatsAppPageState extends State<RegisterPage> {
             height: 36,
             child: IconButton(
               padding: EdgeInsets.zero,
-              onPressed: () => Navigator.of(context).maybePop(),
+              onPressed: () {
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                } else {
+                  context.go('/welcome');
+                }
+              },
               icon: Icon(
                 Icons.arrow_back,
                 size: 20,
@@ -123,7 +125,7 @@ class _RegisterWhatsAppPageState extends State<RegisterPage> {
             child: Padding(
               padding: const EdgeInsets.only(right: 36),
               child: Text(
-                'Buat Akun',
+                'Masuk Akun',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: AppColors.foreground,
@@ -150,14 +152,14 @@ class _RegisterWhatsAppPageState extends State<RegisterPage> {
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
-            Icons.chat_bubble_outline,
+            Icons.login,
             size: 24,
             color: AppColors.primary,
           ),
         ),
         const SizedBox(height: 10),
         Text(
-          'Daftar dengan WhatsApp',
+          'Selamat Datang Kembali',
           style: TextStyle(
             color: AppColors.foreground,
             fontSize: 24,
@@ -166,66 +168,11 @@ class _RegisterWhatsAppPageState extends State<RegisterPage> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Masukkan nomor WhatsApp aktif Anda. Kode verifikasi akan dikirim melalui WhatsApp.',
+          'Masukkan nomor WhatsApp yang sudah terdaftar untuk masuk ke akun Anda.',
           style: TextStyle(
             color: AppColors.mutedForeground,
             fontSize: 13,
             height: 1.6,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildNameField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Nama Lengkap',
-          style: TextStyle(
-            color: AppColors.foreground,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.input,
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(24),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              Icon(
-                Icons.person_outline,
-                size: 17,
-                color: AppColors.mutedForeground,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: _nameController,
-                  onChanged: (_) => setState(() {}),
-                  style: TextStyle(color: AppColors.foreground, fontSize: 15),
-                  decoration: InputDecoration(
-                    hintText: 'Ahmad Fauzan',
-                    hintStyle: TextStyle(color: AppColors.mutedForeground),
-                    filled: false,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    disabledBorder: InputBorder.none,
-                    errorBorder: InputBorder.none,
-                    focusedErrorBorder: InputBorder.none,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
-              ),
-            ],
           ),
         ),
       ],
@@ -343,12 +290,12 @@ class _RegisterWhatsAppPageState extends State<RegisterPage> {
           const SizedBox(height: 6),
           Row(
             children: [
-              Icon(Icons.check_circle, size: 13, color: AppColors.success),
-              const SizedBox(width: 6),
-              Text(
-                'Format nomor valid',
-                style: TextStyle(color: AppColors.success, fontSize: 11),
-              ),
+               Icon(Icons.check_circle, size: 13, color: AppColors.success),
+               const SizedBox(width: 6),
+               Text(
+                 'Format nomor valid',
+                 style: TextStyle(color: AppColors.success, fontSize: 11),
+               ),
             ],
           ),
         ],
@@ -370,7 +317,7 @@ class _RegisterWhatsAppPageState extends State<RegisterPage> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Nomor WhatsApp ini akan digunakan sebagai nomor login Anda. Pastikan nomor tetap aktif dan bisa diakses kapan saja.',
+              'Pastikan nomor WhatsApp Anda aktif untuk menerima kode verifikasi saat masuk.',
               style: TextStyle(
                 color: AppColors.mutedForeground,
                 fontSize: 11,
@@ -383,69 +330,11 @@ class _RegisterWhatsAppPageState extends State<RegisterPage> {
     );
   }
 
-  Widget _buildAgreement() {
-    return GestureDetector(
-      onTap: () => setState(() => _agreed = !_agreed),
-      behavior: HitTestBehavior.opaque,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 20,
-            height: 20,
-            margin: const EdgeInsets.only(top: 2),
-            decoration: BoxDecoration(
-              color: _agreed ? AppColors.primary : AppColors.input,
-              border: Border.all(
-                color: _agreed ? AppColors.primary : AppColors.border,
-              ),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: _agreed
-                ? const Icon(Icons.check, size: 12, color: Colors.white)
-                : null,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: RichText(
-              text: TextSpan(
-                style: TextStyle(
-                  color: AppColors.mutedForeground,
-                  fontSize: 11,
-                  height: 1.6,
-                ),
-                children: [
-                  const TextSpan(text: 'Saya menyetujui '),
-                  TextSpan(
-                    text: 'Syarat & Ketentuan',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const TextSpan(text: ' dan '),
-                  TextSpan(
-                    text: 'Kebijakan Privasi',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const TextSpan(text: ' TAGANA Flood Monitor.'),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSubmitButton() {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: _canSubmit ? _onSubmit : null,
+        onPressed: _isPhoneValid ? _onSubmit : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
           foregroundColor: AppColors.primaryForeground,
@@ -467,31 +356,31 @@ class _RegisterWhatsAppPageState extends State<RegisterPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'Verifikasi',
+                    'Masuk',
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                   ),
                   SizedBox(width: 8),
-                  Icon(Icons.send, size: 18),
+                  Icon(Icons.login, size: 18),
                 ],
               ),
       ),
     );
   }
 
-  Widget _buildLoginLink() {
+  Widget _buildRegisterLink() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          'Sudah punya akun?',
+          'Belum punya akun?',
           style: TextStyle(color: AppColors.mutedForeground, fontSize: 13),
         ),
         TextButton(
           onPressed: () {
-            context.go('/login');
+            context.push('/register');
           },
           child: Text(
-            'Masuk',
+            'Daftar',
             style: TextStyle(
               color: AppColors.primary,
               fontSize: 13,

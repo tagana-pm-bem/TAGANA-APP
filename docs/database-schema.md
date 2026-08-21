@@ -8,11 +8,13 @@ Additional profile information for Supabase Auth users.
 |------|------|-------------|
 | `id` | `uuid` | Primary |
 | `name` | `text` |  |
-| `phone` | `text` |  Nullable |
+| `phone` | `text` |  |
 | `created_at` | `timestamptz` |  |
 | `updated_at` | `timestamptz` |  |
+| `email` | `text` |  Nullable |
 
 ## Table `device_locations`
+
 Historical GPS locations reported by TAGANA devices.
 
 ### Columns
@@ -70,10 +72,10 @@ Perangkat TAGANA. Satu user dapat memiliki banyak device, tetapi satu device han
 | Name | Type | Constraints |
 |------|------|-------------|
 | `id` | `uuid` | Primary |
-| `user_id` | `uuid` |  |
+| `user_id` | `uuid` |  Nullable |
 | `device_code` | `text` |  Unique |
 | `device_name` | `text` |  |
-| `device_token_hash` | `text` |  |
+| `device_token_hash` | `text` |  Nullable |
 | `firmware_version` | `text` |  Nullable |
 | `is_active` | `bool` |  |
 | `registered_at` | `timestamptz` |  |

@@ -22,6 +22,7 @@ import '../../features/settings/pages/help_page.dart';
 import '../../features/settings/pages/about_page.dart';
 import '../../features/onboarding/welcome_page.dart';
 import '../../features/onboarding/register.dart';
+import '../../features/onboarding/login.dart';
 import '../../features/onboarding/enter_device.dart';
 import '../../features/onboarding/verifying_device.dart';
 import '../../features/onboarding/bluetooth_connection.dart';
@@ -41,6 +42,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/register',
       builder: (context, state) => const RegisterPage(),
+    ),
+    GoRoute(
+      path: '/login',
+      builder: (context, state) => const LoginPage(),
     ),
     GoRoute(
       path: '/enter-device',
