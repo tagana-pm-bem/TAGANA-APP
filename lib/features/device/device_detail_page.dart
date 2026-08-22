@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/services/device_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import 'models/device_detail_data.dart';
 
-class DeviceDetailPage extends StatelessWidget {
+const _kMonths = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+  'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+];
+
+class DeviceDetailPage extends StatefulWidget {
   const DeviceDetailPage({
     required this.deviceId,
     this.isOnline = true,
@@ -16,34 +25,121 @@ class DeviceDetailPage extends StatelessWidget {
   final bool isOnline;
 
   @override
+  State<DeviceDetailPage> createState() => _DeviceDetailPageState();
+}
+
+class _DeviceDetailPageState extends State<DeviceDetailPage> {
+  DeviceDetailData? _data;
+  bool _isLoading = true;
+  String? _errorMessage;
+  RealtimeChannel? _channel;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    _channel = DeviceService.subscribeToDeviceDetail(
+      deviceId: widget.deviceId,
+      onChange: _load,
+    );
+  }
+
+  @override
+  void dispose() {
+    final channel = _channel;
+    if (channel != null) {
+      DeviceService.unsubscribeDeviceStatus(channel);
+    }
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final data = await DeviceService.fetchDeviceDetail(widget.deviceId);
+      if (!mounted) return;
+      setState(() {
+        _data = data;
+        _isLoading = false;
+        _errorMessage = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Gagal memuat detail perangkat. Tarik untuk coba lagi.';
+      });
+    }
+  }
+
+  bool get _isConnected => _data?.device.isConnected ?? widget.isOnline;
+
+  @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: _buildAppBar(context, textTheme),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildMapSection(textTheme),
-            const SizedBox(height: AppSpacing.lg),
-            _buildMonitoringSection(textTheme),
-            const SizedBox(height: AppSpacing.lg),
-            _buildDeviceInfo(textTheme),
-            const SizedBox(height: AppSpacing.lg),
-            _buildRecentActivity(textTheme),
-            const SizedBox(height: AppSpacing.lg),
-            _buildActions(context, textTheme),
-            const SizedBox(height: AppSpacing.xxl),
-          ],
-        ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_errorMessage != null) ...[
+                      _buildErrorBanner(textTheme),
+                      const SizedBox(height: AppSpacing.lg),
+                    ],
+                    if (_data != null) ...[
+                      _buildMapSection(textTheme, _data!),
+                      const SizedBox(height: AppSpacing.lg),
+                      _buildMonitoringSection(textTheme, _data!),
+                      const SizedBox(height: AppSpacing.lg),
+                      _buildDeviceInfo(textTheme, _data!),
+                      const SizedBox(height: AppSpacing.lg),
+                      _buildRecentActivity(textTheme, _data!),
+                      const SizedBox(height: AppSpacing.lg),
+                      _buildActions(context, textTheme),
+                    ],
+                    const SizedBox(height: AppSpacing.xxl),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+
+  Widget _buildErrorBanner(TextTheme textTheme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.destructive.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.destructive.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(LucideIcons.alertTriangle, color: AppColors.destructive, size: 18),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              _errorMessage!,
+              style: textTheme.bodySmall?.copyWith(color: AppColors.destructive),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   PreferredSizeWidget _buildAppBar(BuildContext context, TextTheme textTheme) {
+    final subtitle = _data?.device.deviceCode ?? widget.deviceId;
+
     return AppBar(
       backgroundColor: AppColors.background,
       elevation: 0,
@@ -64,7 +160,7 @@ class DeviceDetailPage extends StatelessWidget {
             ),
           ),
           Text(
-            deviceId,
+            subtitle,
             style: textTheme.labelSmall?.copyWith(
               color: AppColors.mutedForeground,
             ),
@@ -85,7 +181,10 @@ class DeviceDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _buildMapSection(TextTheme textTheme) {
+  Widget _buildMapSection(TextTheme textTheme, DeviceDetailData data) {
+    final device = data.device;
+    final isConnected = _isConnected;
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.card,
@@ -128,14 +227,14 @@ class DeviceDetailPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      deviceId,
+                      device.deviceName,
                       style: textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: AppColors.foreground,
                       ),
                     ),
                     Text(
-                      'ID: TGN_0001',
+                      'ID: ${device.deviceCode}',
                       style: textTheme.bodySmall?.copyWith(
                         color: AppColors.mutedForeground,
                       ),
@@ -143,31 +242,31 @@ class DeviceDetailPage extends StatelessWidget {
                   ],
                 ),
                 Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: isOnline ? AppColors.success : AppColors.destructive,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: isOnline ? const Color(0x8010B981) : const Color(0x80EF4444),
-                          blurRadius: 4,
-                        ),
-                      ],
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: isConnected ? AppColors.success : AppColors.destructive,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: isConnected ? const Color(0x8010B981) : const Color(0x80EF4444),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    isOnline ? 'Terhubung' : 'Offline',
-                    style: textTheme.labelSmall?.copyWith(
-                      color: isOnline ? AppColors.success : AppColors.destructive,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(width: 8),
+                    Text(
+                      isConnected ? 'Terhubung' : 'Offline',
+                      style: textTheme.labelSmall?.copyWith(
+                        color: isConnected ? AppColors.success : AppColors.destructive,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -176,7 +275,44 @@ class DeviceDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _buildMonitoringSection(TextTheme textTheme) {
+  Widget _buildMonitoringSection(TextTheme textTheme, DeviceDetailData data) {
+    final device = data.device;
+
+    final waterValue = device.waterLevel != null
+        ? device.waterLevel!.toStringAsFixed(1)
+        : '-';
+    final waterStatus = device.isFloodDetected
+        ? 'Banjir Terdeteksi'
+        : (device.waterLevel != null ? 'Aman' : 'Tidak ada data');
+    final waterStatusColor = device.isFloodDetected ? AppColors.destructive : AppColors.success;
+
+    final battery = device.batteryLevel?.round();
+    final batteryStatus = battery == null
+        ? 'Tidak ada data'
+        : battery > 80
+            ? 'Optimal'
+            : battery > 30
+                ? 'Sedang'
+                : 'Rendah';
+    final batteryStatusColor = battery == null
+        ? AppColors.mutedForeground
+        : battery > 80
+            ? AppColors.mutedForeground
+            : battery > 30
+                ? AppColors.warning
+                : AppColors.destructive;
+
+    final signal = device.signalStrength;
+    final signalStatus = signal == null
+        ? 'Tidak ada data'
+        : signal > -70
+            ? 'Kuat'
+            : signal > -90
+                ? 'Sedang'
+                : 'Lemah';
+
+    final location = data.location;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -202,9 +338,10 @@ class DeviceDetailPage extends StatelessWidget {
               textTheme,
               icon: LucideIcons.droplets,
               label: 'Water Lvl',
-              value: '1.2m',
-              status: 'Aman',
-              statusColor: AppColors.success,
+              value: waterValue,
+              unit: device.waterLevel != null ? 'm' : null,
+              status: waterStatus,
+              statusColor: waterStatusColor,
               iconColor: AppColors.primary,
               iconBgColor: AppColors.primary.withOpacity(0.1),
             ),
@@ -212,9 +349,10 @@ class DeviceDetailPage extends StatelessWidget {
               textTheme,
               icon: LucideIcons.batteryFull,
               label: 'Baterai',
-              value: '98%',
-              status: 'Optimal',
-              statusColor: AppColors.mutedForeground,
+              value: battery != null ? '$battery' : '-',
+              unit: battery != null ? '%' : null,
+              status: batteryStatus,
+              statusColor: batteryStatusColor,
               iconColor: AppColors.mutedForeground,
               iconBgColor: AppColors.muted,
             ),
@@ -222,9 +360,9 @@ class DeviceDetailPage extends StatelessWidget {
               textTheme,
               icon: LucideIcons.signal,
               label: 'Sinyal',
-              value: '-65',
-              unit: 'dBm',
-              status: 'Kuat',
+              value: signal != null ? '$signal' : '-',
+              unit: signal != null ? 'dBm' : null,
+              status: signalStatus,
               statusColor: AppColors.mutedForeground,
               iconColor: Colors.indigo,
               iconBgColor: Colors.indigo.shade50,
@@ -233,8 +371,8 @@ class DeviceDetailPage extends StatelessWidget {
               textTheme,
               icon: LucideIcons.compass,
               label: 'Koordinat',
-              value: 'Lat: -6.5891',
-              status: 'Long: 106.8438',
+              value: location != null ? 'Lat: ${location.latitude.toStringAsFixed(4)}' : '-',
+              status: location != null ? 'Long: ${location.longitude.toStringAsFixed(4)}' : 'Belum ada data',
               statusColor: AppColors.foreground,
               iconColor: AppColors.destructive,
               iconBgColor: AppColors.destructive.withOpacity(0.1),
@@ -340,7 +478,21 @@ class DeviceDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _buildDeviceInfo(TextTheme textTheme) {
+  String _formatDate(DateTime d) => '${d.day} ${_kMonths[d.month - 1]} ${d.year}';
+
+  Future<void> _openMaps(DeviceLocationInfo location) async {
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}',
+    );
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Widget _buildDeviceInfo(TextTheme textTheme, DeviceDetailData data) {
+    final device = data.device;
+    final location = data.location;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -368,13 +520,21 @@ class DeviceDetailPage extends StatelessWidget {
           ),
           child: Column(
             children: [
-              _buildInfoRow(textTheme, 'Serial Number', 'SN-99283-XQ'),
+              _buildInfoRow(textTheme, 'Kode Perangkat', device.deviceCode),
               const Divider(height: 1),
-              _buildInfoRow(textTheme, 'Versi Perangkat Keras', 'v2.4.1 (Pro)'),
+              _buildInfoRow(textTheme, 'Versi Firmware', device.firmwareVersion ?? '-'),
               const Divider(height: 1),
-              _buildInfoRow(textTheme, 'Tanggal Instalasi', '12 Okt 2023'),
+              _buildInfoRow(textTheme, 'Tanggal Instalasi', _formatDate(device.registeredAt)),
               const Divider(height: 1),
-              _buildInfoRow(textTheme, 'Lokasi', 'Bendungan Katulampa', isLink: true),
+              _buildInfoRow(
+                textTheme,
+                'Lokasi',
+                location != null
+                    ? '${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)}'
+                    : 'Belum ada data',
+                isLink: location != null,
+                onTap: location != null ? () => _openMaps(location) : null,
+              ),
             ],
           ),
         ),
@@ -382,38 +542,86 @@ class DeviceDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(TextTheme textTheme, String label, String value, {bool isLink = false}) {
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: textTheme.bodyMedium?.copyWith(color: AppColors.mutedForeground),
-          ),
-          if (isLink)
-            Row(
-              children: [
-                Text(
-                  value,
-                  style: textTheme.labelMedium?.copyWith(color: AppColors.primary),
-                ),
-                const SizedBox(width: 4),
-                const Icon(LucideIcons.externalLink, size: 14, color: AppColors.primary),
-              ],
-            )
-          else
+  Widget _buildInfoRow(
+    TextTheme textTheme,
+    String label,
+    String value, {
+    bool isLink = false,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
             Text(
-              value,
-              style: textTheme.labelMedium?.copyWith(color: AppColors.foreground),
+              label,
+              style: textTheme.bodyMedium?.copyWith(color: AppColors.mutedForeground),
             ),
-        ],
+            if (isLink)
+              Row(
+                children: [
+                  Text(
+                    value,
+                    style: textTheme.labelMedium?.copyWith(color: AppColors.primary),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(LucideIcons.externalLink, size: 14, color: AppColors.primary),
+                ],
+              )
+            else
+              Text(
+                value,
+                style: textTheme.labelMedium?.copyWith(color: AppColors.foreground),
+              ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildRecentActivity(TextTheme textTheme) {
+  String _formatActivityTime(DateTime dt) {
+    final now = DateTime.now();
+    final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+    final yesterday = now.subtract(const Duration(days: 1));
+    final isYesterday =
+        dt.year == yesterday.year && dt.month == yesterday.month && dt.day == yesterday.day;
+    final hm = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    if (isToday) return 'Hari ini, $hm';
+    if (isYesterday) return 'Kemarin, $hm';
+    return '${dt.day} ${_kMonths[dt.month - 1]}, $hm';
+  }
+
+  IconData _activityIcon(String type) {
+    switch (type) {
+      case 'device_connected':
+      case 'wifi_connected':
+        return LucideIcons.wifi;
+      case 'device_disconnected':
+      case 'wifi_disconnected':
+      case 'ble_disconnected':
+        return LucideIcons.wifiOff;
+      case 'wifi_configured':
+      case 'ble_connected':
+        return LucideIcons.settings;
+      case 'data_sync':
+        return LucideIcons.refreshCw;
+      case 'network_reset':
+        return LucideIcons.refreshCw;
+      case 'emergency_mode':
+        return LucideIcons.alertTriangle;
+      case 'device_registered':
+      case 'firmware_updated':
+      default:
+        return LucideIcons.activity;
+    }
+  }
+
+  Widget _buildRecentActivity(TextTheme textTheme, DeviceDetailData data) {
+    final activities = data.activities;
+
     return Column(
       children: [
         Padding(
@@ -428,29 +636,41 @@ class DeviceDetailPage extends StatelessWidget {
                   color: AppColors.foreground,
                 ),
               ),
-              TextButton(
-                onPressed: () {},
-                child: const Text('Lihat Semua'),
-              ),
+              if (activities.length > 2)
+                TextButton(
+                  onPressed: () {},
+                  child: const Text('Lihat Semua'),
+                ),
             ],
           ),
         ),
-        _buildActivityItem(
-          textTheme,
-          icon: LucideIcons.refreshCw,
-          title: 'Sinkronisasi Data Berhasil',
-          description: 'Data sensor terakhir dikirim ke server pusat.',
-          time: 'Hari ini, 14:32',
-          isPrimary: true,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _buildActivityItem(
-          textTheme,
-          icon: LucideIcons.settings,
-          title: 'Pembaruan Firmware v2.4.1',
-          description: 'Pembaruan sistem keamanan minor diterapkan secara remote.',
-          time: 'Kemarin, 09:15',
-        ),
+        if (activities.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Text(
+              'Belum ada aktivitas tercatat.',
+              textAlign: TextAlign.center,
+              style: textTheme.bodyMedium?.copyWith(color: AppColors.mutedForeground),
+            ),
+          )
+        else
+          for (var i = 0; i < activities.length && i < 2; i++) ...[
+            _buildActivityItem(
+              textTheme,
+              icon: _activityIcon(activities[i].type),
+              title: activities[i].title,
+              description: activities[i].description ?? '-',
+              time: _formatActivityTime(activities[i].createdAt),
+              isPrimary: i == 0,
+            ),
+            if (i == 0) const SizedBox(height: AppSpacing.sm),
+          ],
       ],
     );
   }
@@ -526,10 +746,12 @@ class DeviceDetailPage extends StatelessWidget {
   }
 
   Widget _buildActions(BuildContext context, TextTheme textTheme) {
+    final isConnected = _isConnected;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (!isOnline) ..._buildOfflineBanner(context, textTheme),
+        if (!isConnected) ..._buildOfflineBanner(context, textTheme),
         _buildEmergencyBtn(context),
         const SizedBox(height: AppSpacing.sm),
         _buildTestConnectionBtn(context),
@@ -575,7 +797,7 @@ class DeviceDetailPage extends StatelessWidget {
       ),
       const SizedBox(height: AppSpacing.sm),
       ElevatedButton.icon(
-        onPressed: () => context.push('/device/$deviceId/wifi-config'),
+        onPressed: () => context.push('/device/${widget.deviceId}/wifi-config'),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.destructive,
           foregroundColor: AppColors.destructiveForeground,
@@ -591,7 +813,7 @@ class DeviceDetailPage extends StatelessWidget {
 
   Widget _buildEmergencyBtn(BuildContext context) {
     return ElevatedButton.icon(
-      onPressed: () => context.push('/device/$deviceId/emergency'),
+      onPressed: () => context.push('/device/${widget.deviceId}/emergency'),
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.destructive,
         foregroundColor: AppColors.destructiveForeground,
@@ -605,7 +827,7 @@ class DeviceDetailPage extends StatelessWidget {
 
   Widget _buildTestConnectionBtn(BuildContext context) {
     return ElevatedButton.icon(
-      onPressed: () => context.push('/device/$deviceId/test-connection'),
+      onPressed: () => context.push('/device/${widget.deviceId}/test-connection'),
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.primaryForeground,
@@ -621,7 +843,7 @@ class DeviceDetailPage extends StatelessWidget {
     return ElevatedButton.icon(
       onPressed: () {},
       style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.indigo.shade50, // tertiary fixed like
+        backgroundColor: Colors.indigo.shade50,
         foregroundColor: Colors.indigo.shade900,
         padding: const EdgeInsets.symmetric(vertical: 16),
         elevation: 0,

@@ -1,13 +1,93 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/services/device_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/app_header.dart';
+import '../dashboard/models/dashboard_models.dart';
 
-class DevicesPage extends StatelessWidget {
+enum _DeviceFilter { semua, terhubung, tidakTerhubung, peringatan }
+
+class DevicesPage extends StatefulWidget {
   const DevicesPage({super.key});
+
+  @override
+  State<DevicesPage> createState() => _DevicesPageState();
+}
+
+class _DevicesPageState extends State<DevicesPage> {
+  List<DeviceWithStatus> _devices = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+  RealtimeChannel? _channel;
+
+  final _searchController = TextEditingController();
+  String _query = '';
+  _DeviceFilter _filter = _DeviceFilter.semua;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    _channel = DeviceService.subscribeToDeviceStatus(onChange: _load);
+    _searchController.addListener(() {
+      setState(() => _query = _searchController.text.trim().toLowerCase());
+    });
+  }
+
+  @override
+  void dispose() {
+    final channel = _channel;
+    if (channel != null) {
+      DeviceService.unsubscribeDeviceStatus(channel);
+    }
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final devices = await DeviceService.fetchDevices();
+      if (!mounted) return;
+      setState(() {
+        _devices = devices;
+        _isLoading = false;
+        _errorMessage = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Gagal memuat data perangkat. Tarik untuk coba lagi.';
+      });
+    }
+  }
+
+  bool _isWarning(DeviceWithStatus d) =>
+      d.status == 'warning' || d.status == 'critical';
+
+  List<DeviceWithStatus> get _filteredDevices {
+    return _devices.where((d) {
+      final matchesQuery = _query.isEmpty ||
+          d.deviceName.toLowerCase().contains(_query) ||
+          d.deviceCode.toLowerCase().contains(_query);
+      if (!matchesQuery) return false;
+
+      switch (_filter) {
+        case _DeviceFilter.semua:
+          return true;
+        case _DeviceFilter.terhubung:
+          return d.isConnected;
+        case _DeviceFilter.tidakTerhubung:
+          return !d.isConnected;
+        case _DeviceFilter.peringatan:
+          return _isWarning(d);
+      }
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,26 +96,36 @@ class DevicesPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: const AppHeader(),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.md,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildStatsGrid(textTheme),
-            const SizedBox(height: AppSpacing.lg),
-            _buildSearchAndFilter(textTheme),
-            const SizedBox(height: AppSpacing.lg),
-            _buildDeviceList(context, textTheme),
-            // Padding for FAB
-            const SizedBox(height: 80),
-          ],
-        ),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.md,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_errorMessage != null) ...[
+                      _buildErrorBanner(textTheme),
+                      const SizedBox(height: AppSpacing.lg),
+                    ],
+                    _buildStatsGrid(textTheme),
+                    const SizedBox(height: AppSpacing.lg),
+                    _buildSearchAndFilter(textTheme),
+                    const SizedBox(height: AppSpacing.lg),
+                    _buildDeviceList(context, textTheme),
+                    // Padding for FAB
+                    const SizedBox(height: 80),
+                  ],
+                ),
+              ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {},
+        onPressed: () => context.push('/enter-device'),
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.primaryForeground,
         icon: const Icon(LucideIcons.plus),
@@ -44,15 +134,42 @@ class DevicesPage extends StatelessWidget {
     );
   }
 
-
+  Widget _buildErrorBanner(TextTheme textTheme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.destructive.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.destructive.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(LucideIcons.alertTriangle, color: AppColors.destructive, size: 18),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              _errorMessage!,
+              style: textTheme.bodySmall?.copyWith(color: AppColors.destructive),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildStatsGrid(TextTheme textTheme) {
+    final total = _devices.length;
+    final connected = _devices.where((d) => d.isConnected).length;
+    final disconnected = total - connected;
+    final warning = _devices.where(_isWarning).length;
+
     return Row(
       children: [
         Expanded(
           child: _buildStatCard(
             textTheme,
-            value: '12',
+            value: '$total',
             label: 'Total',
             valueColor: AppColors.primary,
           ),
@@ -61,7 +178,7 @@ class DevicesPage extends StatelessWidget {
         Expanded(
           child: _buildStatCard(
             textTheme,
-            value: '10',
+            value: '$connected',
             label: 'Terhubung',
             valueColor: AppColors.success,
           ),
@@ -70,7 +187,7 @@ class DevicesPage extends StatelessWidget {
         Expanded(
           child: _buildStatCard(
             textTheme,
-            value: '1',
+            value: '$disconnected',
             label: 'Tidak\nTerhubung',
             valueColor: AppColors.mutedForeground,
           ),
@@ -79,10 +196,10 @@ class DevicesPage extends StatelessWidget {
         Expanded(
           child: _buildStatCard(
             textTheme,
-            value: '1',
+            value: '$warning',
             label: 'Peringatan',
             valueColor: AppColors.destructive,
-            isWarning: true,
+            isWarning: warning > 0,
           ),
         ),
       ],
@@ -140,6 +257,7 @@ class DevicesPage extends StatelessWidget {
     return Column(
       children: [
         TextField(
+          controller: _searchController,
           decoration: InputDecoration(
             hintText: 'Cari perangkat...',
             prefixIcon: const Icon(LucideIcons.search, color: AppColors.mutedForeground),
@@ -165,13 +283,13 @@ class DevicesPage extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              _buildFilterChip('Semua', isSelected: true),
+              _buildFilterChip('Semua', _DeviceFilter.semua),
               const SizedBox(width: AppSpacing.sm),
-              _buildFilterChip('Terhubung'),
+              _buildFilterChip('Terhubung', _DeviceFilter.terhubung),
               const SizedBox(width: AppSpacing.sm),
-              _buildFilterChip('Tidak Terhubung'),
+              _buildFilterChip('Tidak Terhubung', _DeviceFilter.tidakTerhubung),
               const SizedBox(width: AppSpacing.sm),
-              _buildFilterChip('Peringatan'),
+              _buildFilterChip('Peringatan', _DeviceFilter.peringatan),
             ],
           ),
         ),
@@ -179,91 +297,133 @@ class DevicesPage extends StatelessWidget {
     );
   }
 
-  Widget _buildFilterChip(String label, {bool isSelected = false}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: isSelected ? AppColors.primary : AppColors.card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isSelected ? AppColors.primary : AppColors.border,
+  Widget _buildFilterChip(String label, _DeviceFilter value) {
+    final isSelected = _filter == value;
+    return InkWell(
+      onTap: () => setState(() => _filter = value),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : AppColors.card,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.border,
+          ),
         ),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: isSelected ? AppColors.primaryForeground : AppColors.mutedForeground,
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: isSelected ? AppColors.primaryForeground : AppColors.mutedForeground,
+          ),
         ),
       ),
     );
   }
 
   Widget _buildDeviceList(BuildContext context, TextTheme textTheme) {
+    final devices = _filteredDevices;
+
+    if (_devices.isEmpty) {
+      return _buildEmptyState(
+        textTheme,
+        context,
+        message: 'Belum ada perangkat terhubung',
+        showAction: true,
+      );
+    }
+
+    if (devices.isEmpty) {
+      return _buildEmptyState(
+        textTheme,
+        context,
+        message: 'Tidak ada perangkat yang cocok dengan pencarian/filter',
+        showAction: false,
+      );
+    }
+
     return Column(
       children: [
-        _buildDeviceItem(
-          context,
-          textTheme,
-          name: 'TAGANA-001',
-          code: 'TGN_0001',
-          timeAgo: '2 menit lalu',
-          icon: LucideIcons.radio,
-          statusText: 'Normal',
-          isConnected: true,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _buildDeviceItem(
-          context,
-          textTheme,
-          name: 'TAGANA-002',
-          code: 'TGN_0002',
-          timeAgo: 'Baru saja',
-          icon: LucideIcons.router,
-          statusText: 'Baterai Rendah',
-          isConnected: true,
-          isWarning: true,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _buildDeviceItem(
-          context,
-          textTheme,
-          name: 'TAGANA-003',
-          code: 'TGN_0003',
-          timeAgo: '5 jam lalu',
-          icon: LucideIcons.wifiOff,
-          statusText: 'Tidak Terhubung',
-          isConnected: false,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _buildDeviceItem(
-          context,
-          textTheme,
-          name: 'TAGANA-004',
-          code: 'TGN_0004',
-          timeAgo: '10 menit lalu',
-          icon: LucideIcons.router,
-          statusText: 'Normal',
-          isConnected: true,
-        ),
+        for (final device in devices) ...[
+          _buildDeviceItem(context, textTheme, device),
+          const SizedBox(height: AppSpacing.sm),
+        ],
       ],
     );
   }
 
+  Widget _buildEmptyState(
+    TextTheme textTheme,
+    BuildContext context, {
+    required String message,
+    required bool showAction,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          Icon(LucideIcons.radio, size: 32, color: AppColors.mutedForeground),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: textTheme.bodyMedium?.copyWith(color: AppColors.mutedForeground),
+          ),
+          if (showAction) ...[
+            const SizedBox(height: AppSpacing.sm),
+            TextButton(
+              onPressed: () => context.push('/enter-device'),
+              child: const Text('Hubungkan Perangkat'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _statusText(DeviceWithStatus d) {
+    switch (d.status) {
+      case 'online':
+        return 'Normal';
+      case 'warning':
+        return 'Peringatan';
+      case 'critical':
+        return 'Kritis';
+      default:
+        return 'Tidak Terhubung';
+    }
+  }
+
+  String _formatTimeAgo(DateTime? time) {
+    if (time == null) return 'Belum pernah terhubung';
+    final diff = DateTime.now().difference(time);
+    if (diff.inSeconds < 60) return 'Baru saja';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} menit lalu';
+    if (diff.inHours < 24) return '${diff.inHours} jam lalu';
+    return '${diff.inDays} hari lalu';
+  }
+
   Widget _buildDeviceItem(
     BuildContext context,
-    TextTheme textTheme, {
-    required String name,
-    required String code,
-    required String timeAgo,
-    required IconData icon,
-    required String statusText,
-    required bool isConnected,
-    bool isWarning = false,
-  }) {
+    TextTheme textTheme,
+    DeviceWithStatus device,
+  ) {
+    final isConnected = device.isConnected;
+    final isWarning = _isWarning(device);
+    final icon = isConnected ? LucideIcons.radio : LucideIcons.wifiOff;
+    final statusText = _statusText(device);
+    final timeAgo = _formatTimeAgo(device.lastSeenAt);
+
     return InkWell(
-      onTap: () => context.push('/device/$name', extra: isConnected),
+      onTap: () => context.push('/device/${device.id}', extra: isConnected),
       borderRadius: BorderRadius.circular(12),
       child: Container(
           padding: const EdgeInsets.all(AppSpacing.md),
@@ -296,7 +456,7 @@ class DevicesPage extends StatelessWidget {
                           color: isWarning
                               ? Colors.red.shade100
                               : (isConnected ? Colors.indigo.shade50 : AppColors.muted),
-                          borderRadius: BorderRadius.circular(20), // Fully rounded as per HTML
+                          borderRadius: BorderRadius.circular(20),
                         ),
                         child: Icon(
                           icon,
@@ -310,7 +470,7 @@ class DevicesPage extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            name,
+                            device.deviceName,
                             style: textTheme.labelLarge?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: AppColors.foreground,
@@ -318,7 +478,7 @@ class DevicesPage extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            code,
+                            device.deviceCode,
                             style: textTheme.labelSmall?.copyWith(
                               color: AppColors.mutedForeground,
                             ),
@@ -386,7 +546,7 @@ class DevicesPage extends StatelessWidget {
               if (!isConnected) ...[
                 const SizedBox(height: AppSpacing.md),
                 ElevatedButton.icon(
-                  onPressed: () => context.push('/device/$name/wifi-config'),
+                  onPressed: () => context.push('/device/${device.deviceName}/wifi-config'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.destructive,
                     foregroundColor: AppColors.destructiveForeground,

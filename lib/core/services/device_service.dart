@@ -1,10 +1,12 @@
-import 'dart:developer' as developer;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:tagana_app/core/supabase/supabase_client.dart';
 import 'package:tagana_app/features/onboarding/verifying_device.dart';
 import 'package:tagana_app/features/auth/data/user_repository.dart';
+import '../../features/dashboard/models/dashboard_models.dart';
+import '../../features/device/models/device_detail_data.dart';
 
-/// Service untuk verifikasi dan pairing perangkat TAGANA ke akun pengguna.
+/// Service untuk verifikasi dan pairing perangkat TAGANA ke akun pengguna,
+/// serta pengambilan data perangkat (list & detail) untuk kebutuhan UI.
 class DeviceService {
   DeviceService._();
 
@@ -175,6 +177,160 @@ class DeviceService {
         region: '-',
       ),
     );
+  }
+
+  /// Ambil semua perangkat milik user yang login beserta status terbarunya.
+  /// RLS otomatis membatasi ke device milik auth.uid(), sama seperti di
+  /// DashboardService.
+  static Future<List<DeviceWithStatus>> fetchDevices() async {
+    final raw = await SupabaseClientService.client
+        .from('devices')
+        .select('''
+          id,
+          device_code,
+          device_name,
+          firmware_version,
+          is_active,
+          registered_at,
+          device_status (
+            status,
+            water_level,
+            battery_level,
+            signal_strength,
+            is_flood_detected,
+            last_seen_at,
+            updated_at
+          )
+        ''')
+        .order('registered_at', ascending: false);
+
+    return (raw as List)
+        .map((e) => DeviceWithStatus.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Subscribe realtime ke perubahan device_status, khusus dipakai halaman
+  /// daftar perangkat. Channel diberi nama berbeda dari yang dipakai
+  /// DashboardService supaya tidak bentrok kalau kedua halaman aktif.
+  static RealtimeChannel subscribeToDeviceStatus({
+    required void Function() onChange,
+  }) {
+    final channel = SupabaseClientService.client
+        .channel('devices-page-status')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'device_status',
+          callback: (payload) => onChange(),
+        )
+        .subscribe();
+
+    return channel;
+  }
+
+  /// Ambil detail satu perangkat: info dasar + status terbaru + lokasi
+  /// terbaru + log aktivitas terbaru. RLS otomatis membatasi ke device
+  /// milik auth.uid(), sama seperti fetchDevices().
+  static Future<DeviceDetailData> fetchDeviceDetail(String deviceId) async {
+    final deviceRaw = await SupabaseClientService.client
+        .from('devices')
+        .select('''
+          id,
+          device_code,
+          device_name,
+          firmware_version,
+          is_active,
+          registered_at,
+          device_status (
+            status,
+            water_level,
+            battery_level,
+            signal_strength,
+            is_flood_detected,
+            last_seen_at,
+            updated_at
+          )
+        ''')
+        .eq('id', deviceId)
+        .single();
+
+    final locationRaw = await SupabaseClientService.client
+        .from('device_locations')
+        .select('latitude, longitude, accuracy, recorded_at')
+        .eq('device_id', deviceId)
+        .order('recorded_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+    final activitiesRaw = await SupabaseClientService.client
+        .from('device_activities')
+        .select('id, type, title, description, created_at')
+        .eq('device_id', deviceId)
+        .order('created_at', ascending: false)
+        .limit(10);
+
+    return DeviceDetailData(
+      device: DeviceDetail.fromJson(deviceRaw),
+      location: locationRaw != null
+          ? DeviceLocationInfo.fromJson(locationRaw)
+          : null,
+      activities: (activitiesRaw as List)
+          .map((e) => DeviceActivity.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  /// Subscribe realtime khusus satu perangkat: status, lokasi, dan
+  /// aktivitas. Dipakai di halaman DeviceDetailPage.
+  static RealtimeChannel subscribeToDeviceDetail({
+    required String deviceId,
+    required void Function() onChange,
+  }) {
+    final channel = SupabaseClientService.client
+        .channel('device-detail-$deviceId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'device_status',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'device_id',
+            value: deviceId,
+          ),
+          callback: (payload) => onChange(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'device_locations',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'device_id',
+            value: deviceId,
+          ),
+          callback: (payload) => onChange(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'device_activities',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'device_id',
+            value: deviceId,
+          ),
+          callback: (payload) => onChange(),
+        )
+        .subscribe();
+
+    return channel;
+  }
+
+  /// Unsubscribe generik — dipakai untuk channel apa pun: daftar perangkat
+  /// (subscribeToDeviceStatus) maupun detail perangkat
+  /// (subscribeToDeviceDetail).
+  static Future<void> unsubscribeDeviceStatus(RealtimeChannel channel) async {
+    await SupabaseClientService.client.removeChannel(channel);
   }
 
   /// Terjemahkan pesan error teknis ke pesan yang ramah pengguna.

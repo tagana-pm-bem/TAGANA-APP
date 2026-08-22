@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../core/widgets/app_header.dart';
+import '../auth/data/user_repository.dart';
+import '../auth/models/user_profile.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -14,14 +16,75 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  // TODO: belum ada tabel preferensi notifikasi di database — toggle ini
+  // masih murni UI state, belum persist. Perlu tabel (mis. user_preferences)
+  // kalau mau disimpan beneran.
   bool _criticalAlertsEnabled = true;
   bool _deviceNotifsEnabled = false;
 
-  // Dummy user data – replace with real data source later
-  final String _userName = 'Yudha';
-  final String _userEmail = 'yudha@example.com';
-  final String _userAvatarUrl =
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuA3Kja-5loOn0yDsu4GJ_va683woaMvhMwz_WkBVgbgYZu_VIxqDsgmCBq2Vl3aYn7NY4O2TfclqE2xloEi5eMOxpMnoAgqkUqPabJA-ynTisg8EpiKAivdLV2gMruY266b0NcxhHSB2JO_5mTwDKywkCXheWc8eSfdj5ffcku4V0kRLBroO30ESGYhGkc5Pt-MzSNctTpKwmzsh6ledJ00OOixr-90xJFDL19RDAsLRi53PrR2dt6J';
+  UserProfile? _user;
+  String _appVersion = '';
+  bool _isLoggingOut = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _user = UserRepository.currentUser;
+    if (_user == null) {
+      // Fallback jaga-jaga kalau currentUser belum ke-restore saat halaman dibuka.
+      UserRepository.restoreSessionProfile().then((user) {
+        if (!mounted) return;
+        setState(() => _user = user);
+      });
+    }
+    _loadAppVersion();
+  }
+
+  Future<void> _loadAppVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() => _appVersion = 'v${info.version}');
+    } catch (_) {
+      // Tidak kritis — biarkan kosong kalau gagal.
+    }
+  }
+
+  Future<void> _handleLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Keluar dari akun?'),
+        content: const Text('Anda perlu login kembali untuk mengakses aplikasi.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('Keluar', style: TextStyle(color: AppColors.destructive)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isLoggingOut = true);
+    try {
+      await UserRepository.logout();
+      if (!mounted) return;
+      // TODO: sesuaikan dengan route welcome/login asli di app_router.dart
+      context.go('/welcome');
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoggingOut = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal keluar. Coba lagi.')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,6 +139,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   textTheme,
                   icon: LucideIcons.phone,
                   title: 'Nomor Telepon',
+                  trailingText: _user?.phone,
                   onTap: () => context.push('/settings/phone'),
                 ),
                 _buildSettingsItem(
@@ -142,7 +206,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   textTheme,
                   icon: LucideIcons.smartphone,
                   title: 'Versi Aplikasi',
-                  trailingText: 'v1.0.0',
+                  trailingText: _appVersion.isNotEmpty ? _appVersion : '-',
                   showBorder: false,
                 ),
               ],
@@ -159,6 +223,13 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildProfileCard(TextTheme textTheme) {
+    final user = _user;
+    final name = user?.name.isNotEmpty == true ? user!.name : 'Pengguna';
+    final subtitle = (user?.email?.isNotEmpty == true)
+        ? user!.email!
+        : (user?.phone ?? '-');
+    final initials = _initialsOf(name);
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -175,35 +246,49 @@ class _SettingsPageState extends State<SettingsPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 32,
-                backgroundImage: NetworkImage(_userAvatarUrl),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _userName,
+          Expanded(
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 32,
+                  backgroundColor: AppColors.primaryContainer,
+                  child: Text(
+                    initials,
                     style: textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: AppColors.foreground,
+                      color: AppColors.primary,
                     ),
                   ),
-                  Text(
-                    _userEmail,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: AppColors.mutedForeground,
-                    ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.foreground,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        subtitle,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: AppColors.mutedForeground,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
+          const SizedBox(width: AppSpacing.sm),
           ElevatedButton(
-            onPressed: () {},
+            onPressed: () => context.push('/settings/edit-profile'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryContainer,
               foregroundColor: AppColors.primary,
@@ -218,6 +303,13 @@ class _SettingsPageState extends State<SettingsPage> {
         ],
       ),
     );
+  }
+
+  String _initialsOf(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    return (parts.first.substring(0, 1) + parts.last.substring(0, 1)).toUpperCase();
   }
 
   Widget _buildSettingsSection(
@@ -295,7 +387,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ],
             ),
-            if (trailingText != null)
+            if (trailingText != null && trailingText.isNotEmpty)
               Text(
                 trailingText,
                 style: textTheme.labelSmall?.copyWith(color: AppColors.mutedForeground),
@@ -351,7 +443,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildLogoutButton(TextTheme textTheme) {
     return InkWell(
-      onTap: () {},
+      onTap: _isLoggingOut ? null : _handleLogout,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         width: double.infinity,
@@ -368,14 +460,20 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ],
         ),
-        child: Text(
-          'Keluar',
-          textAlign: TextAlign.center,
-          style: textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: AppColors.destructive,
-          ),
-        ),
+        child: _isLoggingOut
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Text(
+                'Keluar',
+                textAlign: TextAlign.center,
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.destructive,
+                ),
+              ),
       ),
     );
   }
