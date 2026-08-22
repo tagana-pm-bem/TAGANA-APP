@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
+import '../auth/data/user_repository.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -21,7 +22,9 @@ class _SplashPageState extends State<SplashPage> {
 
     if (!mounted) return;
 
-    context.go('/login');
+    final isLoggedIn = UserRepository.currentUser != null;
+
+    context.go(isLoggedIn ? '/dashboard' : '/login');
   }
 
   @override

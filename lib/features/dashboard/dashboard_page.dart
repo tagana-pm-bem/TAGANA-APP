@@ -1,13 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/services/dashboard_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/app_header.dart';
+import '../auth/data/user_repository.dart';
+import 'models/dashboard_models.dart';
 
-class DashboardPage extends StatelessWidget {
+class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  DashboardData _data = DashboardData.empty;
+  bool _isLoading = true;
+  String? _errorMessage;
+  RealtimeChannel? _channel;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    _channel = DashboardService.subscribeToDeviceStatus(onChange: _load);
+  }
+
+  @override
+  void dispose() {
+    final channel = _channel;
+    if (channel != null) {
+      DashboardService.unsubscribe(channel);
+    }
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final data = await DashboardService.fetchDashboardData();
+      if (!mounted) return;
+      setState(() {
+        _data = data;
+        _isLoading = false;
+        _errorMessage = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Gagal memuat data dashboard. Tarik untuk coba lagi.';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,37 +64,70 @@ class DashboardPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: const AppHeader(),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.md,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildGreeting(textTheme),
-            const SizedBox(height: AppSpacing.lg),
-            _buildStatsGrid(textTheme),
-            const SizedBox(height: AppSpacing.lg),
-            _buildQuickActions(textTheme),
-            const SizedBox(height: AppSpacing.lg),
-            _buildAlerts(textTheme),
-            const SizedBox(height: AppSpacing.lg),
-            _buildDeviceList(context, textTheme),
-          ],
-        ),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.md,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildGreeting(textTheme),
+                    const SizedBox(height: AppSpacing.lg),
+                    if (_errorMessage != null) ...[
+                      _buildErrorBanner(textTheme),
+                      const SizedBox(height: AppSpacing.lg),
+                    ],
+                    _buildStatsGrid(textTheme, _data),
+                    const SizedBox(height: AppSpacing.lg),
+                    _buildQuickActions(textTheme),
+                    const SizedBox(height: AppSpacing.lg),
+                    _buildAlerts(textTheme, _data.alerts),
+                    const SizedBox(height: AppSpacing.lg),
+                    _buildDeviceList(context, textTheme, _data.devices),
+                  ],
+                ),
+              ),
       ),
     );
   }
 
-
+  Widget _buildErrorBanner(TextTheme textTheme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.destructive.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.destructive.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(LucideIcons.alertTriangle, color: AppColors.destructive, size: 18),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              _errorMessage!,
+              style: textTheme.bodySmall?.copyWith(color: AppColors.destructive),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildGreeting(TextTheme textTheme) {
+    final name = UserRepository.currentUser?.name ?? '';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Selamat pagi, Yudha',
+          name.isNotEmpty ? 'Selamat pagi, $name' : 'Selamat pagi',
           style: textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.bold,
             color: AppColors.primary,
@@ -63,7 +144,7 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _buildStatsGrid(TextTheme textTheme) {
+  Widget _buildStatsGrid(TextTheme textTheme, DashboardData data) {
     return GridView.count(
       crossAxisCount: 2,
       crossAxisSpacing: AppSpacing.sm,
@@ -76,28 +157,28 @@ class DashboardPage extends StatelessWidget {
           textTheme,
           icon: LucideIcons.radio,
           label: 'AKTIF',
-          value: '12',
+          value: '${data.totalDevices}',
           subtitle: 'Perangkat Aktif',
         ),
         _buildStatCard(
           textTheme,
           icon: LucideIcons.wifi,
           label: 'STABIL',
-          value: '10',
+          value: '${data.connectedDevices}',
           subtitle: 'Terhubung',
         ),
         _buildStatCard(
           textTheme,
           icon: LucideIcons.alertTriangle,
-          label: 'AMAN',
-          value: '0',
+          label: data.activeAlertsCount > 0 ? 'PERHATIAN' : 'AMAN',
+          value: '${data.activeAlertsCount}',
           subtitle: 'Peringatan',
         ),
         _buildStatCard(
           textTheme,
           icon: LucideIcons.activity,
           label: 'SISTEM',
-          value: 'Stabil',
+          value: data.systemCondition,
           subtitle: 'Kondisi',
           valueSize: 20,
         ),
@@ -179,7 +260,7 @@ class DashboardPage extends StatelessWidget {
             icon: LucideIcons.plusCircle,
             label: 'Hubungkan',
             isPrimary: true,
-            onTap: () {},
+            onTap: () => context.push('/enter-device'),
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
@@ -188,7 +269,7 @@ class DashboardPage extends StatelessWidget {
             textTheme,
             icon: LucideIcons.map,
             label: 'Lihat Peta',
-            onTap: () {},
+            onTap: () => context.go('/map'),
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
@@ -197,7 +278,7 @@ class DashboardPage extends StatelessWidget {
             textTheme,
             icon: LucideIcons.history,
             label: 'Riwayat',
-            onTap: () {},
+            onTap: () => context.go('/history'),
           ),
         ),
       ],
@@ -248,7 +329,9 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _buildAlerts(TextTheme textTheme) {
+  Widget _buildAlerts(TextTheme textTheme, List<AlertSummary> alerts) {
+    final latest = alerts.isNotEmpty ? alerts.first : null;
+
     return Column(
       children: [
         Row(
@@ -263,84 +346,132 @@ class DashboardPage extends StatelessWidget {
               ),
             ),
             TextButton(
-              onPressed: () {},
+              onPressed: () => context.go('/history'),
               child: Text('Lihat Semua', style: textTheme.labelMedium),
             ),
           ],
         ),
         const Divider(height: 1, color: AppColors.border),
         const SizedBox(height: AppSpacing.sm),
-        Container(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: const BorderRadius.horizontal(
-              right: Radius.circular(12),
-            ),
-            border: Border(
-              left: BorderSide(color: Colors.blue.shade500, width: 4),
-              top: const BorderSide(color: AppColors.border),
-              right: const BorderSide(color: AppColors.border),
-              bottom: const BorderSide(color: AppColors.border),
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(LucideIcons.info, color: Colors.blue.shade500, size: 20),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Sistem Normal',
-                          style: textTheme.labelLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        Text(
-                          '08:00',
-                          style: textTheme.labelSmall?.copyWith(
-                            color: AppColors.mutedForeground,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Row(
-                      children: [
-                        Icon(LucideIcons.mapPin,
-                            size: 14, color: AppColors.mutedForeground),
-                        const SizedBox(width: 4),
-                        Text('Pusat',
-                            style: textTheme.labelSmall
-                                ?.copyWith(color: AppColors.mutedForeground)),
-                        const SizedBox(width: AppSpacing.md),
-                        Icon(LucideIcons.checkCircle2,
-                            size: 14, color: AppColors.mutedForeground),
-                        const SizedBox(width: 4),
-                        Text('Aktif',
-                            style: textTheme.labelSmall
-                                ?.copyWith(color: AppColors.mutedForeground)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+        if (latest == null)
+          _buildNoAlertCard(textTheme)
+        else
+          _buildAlertCard(textTheme, latest),
       ],
     );
   }
 
-  Widget _buildDeviceList(BuildContext context, TextTheme textTheme) {
+  Widget _buildNoAlertCard(TextTheme textTheme) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: const BorderRadius.horizontal(right: Radius.circular(12)),
+        border: Border(
+          left: BorderSide(color: Colors.blue.shade500, width: 4),
+          top: const BorderSide(color: AppColors.border),
+          right: const BorderSide(color: AppColors.border),
+          bottom: const BorderSide(color: AppColors.border),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(LucideIcons.info, color: Colors.blue.shade500, size: 20),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              'Sistem Normal — belum ada peringatan.',
+              style: textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlertCard(TextTheme textTheme, AlertSummary alert) {
+    final color = switch (alert.severity) {
+      'critical' => AppColors.destructive,
+      'warning' => AppColors.warning,
+      _ => Colors.blue.shade500,
+    };
+    final icon = switch (alert.severity) {
+      'critical' => LucideIcons.alertOctagon,
+      'warning' => LucideIcons.alertTriangle,
+      _ => LucideIcons.info,
+    };
+    final timeLabel = _formatTimeAgo(alert.triggeredAt);
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: const BorderRadius.horizontal(right: Radius.circular(12)),
+        border: Border(
+          left: BorderSide(color: color, width: 4),
+          top: const BorderSide(color: AppColors.border),
+          right: const BorderSide(color: AppColors.border),
+          bottom: const BorderSide(color: AppColors.border),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        alert.message,
+                        style: textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      timeLabel,
+                      style: textTheme.labelSmall?.copyWith(
+                        color: AppColors.mutedForeground,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Row(
+                  children: [
+                    Icon(LucideIcons.radio, size: 14, color: AppColors.mutedForeground),
+                    const SizedBox(width: 4),
+                    Text(
+                      alert.deviceName ?? alert.deviceCode ?? '-',
+                      style: textTheme.labelSmall?.copyWith(color: AppColors.mutedForeground),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeviceList(
+    BuildContext context,
+    TextTheme textTheme,
+    List<DeviceWithStatus> devices,
+  ) {
     return Column(
       children: [
         Row(
@@ -355,7 +486,7 @@ class DashboardPage extends StatelessWidget {
               ),
             ),
             IconButton(
-              onPressed: () {},
+              onPressed: () => context.go('/devices'),
               icon: const Icon(LucideIcons.filter, size: 20),
               color: AppColors.mutedForeground,
             ),
@@ -363,38 +494,55 @@ class DashboardPage extends StatelessWidget {
         ),
         const Divider(height: 1, color: AppColors.border),
         const SizedBox(height: AppSpacing.sm),
-        _buildDeviceItem(
-          context,
-          textTheme,
-          name: 'TAGANA-001',
-          code: 'TGN_0001',
-          timeAgo: '2 min ago',
-          batteryLevel: 98,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _buildDeviceItem(
-          context,
-          textTheme,
-          name: 'TAGANA-002',
-          code: 'TGN_0002',
-          timeAgo: '5 min ago',
-          batteryLevel: 45,
-        ),
+        if (devices.isEmpty)
+          _buildEmptyDeviceState(textTheme, context)
+        else
+          ...devices.map(
+            (d) => Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: _buildDeviceItem(context, textTheme, d),
+            ),
+          ),
       ],
+    );
+  }
+
+  Widget _buildEmptyDeviceState(TextTheme textTheme, BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          Icon(LucideIcons.radio, size: 32, color: AppColors.mutedForeground),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Belum ada perangkat terhubung',
+            style: textTheme.bodyMedium?.copyWith(color: AppColors.mutedForeground),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          TextButton(
+            onPressed: () => context.push('/enter-device'),
+            child: const Text('Hubungkan Perangkat'),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildDeviceItem(
     BuildContext context,
-    TextTheme textTheme, {
-    required String name,
-    required String code,
-    required String timeAgo,
-    required int batteryLevel,
-  }) {
+    TextTheme textTheme,
+    DeviceWithStatus device,
+  ) {
+    final batteryLevel = (device.batteryLevel ?? 0).round();
+
     IconData batteryIcon;
     Color batteryColor;
-
     if (batteryLevel > 80) {
       batteryIcon = LucideIcons.batteryFull;
       batteryColor = AppColors.success;
@@ -406,8 +554,32 @@ class DashboardPage extends StatelessWidget {
       batteryColor = AppColors.destructive;
     }
 
+    final isConnected = device.isConnected;
+    final statusLabel = switch (device.status) {
+      'critical' => 'Kritis',
+      'warning' => 'Peringatan',
+      'online' => 'Terhubung',
+      _ => 'Offline',
+    };
+    final statusColor = switch (device.status) {
+      'critical' => AppColors.destructive,
+      'warning' => AppColors.warning,
+      'online' => Colors.green.shade800,
+      _ => AppColors.mutedForeground,
+    };
+    final statusBg = switch (device.status) {
+      'critical' => AppColors.destructive.withOpacity(0.12),
+      'warning' => AppColors.warning.withOpacity(0.15),
+      'online' => Colors.green.shade100,
+      _ => AppColors.muted,
+    };
+
+    final timeAgo = device.lastSeenAt != null
+        ? _formatTimeAgo(device.lastSeenAt!)
+        : 'Belum pernah terhubung';
+
     return InkWell(
-      onTap: () => context.push('/device/$name'),
+      onTap: () => context.push('/device/${device.id}', extra: isConnected),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.md),
@@ -419,90 +591,77 @@ class DashboardPage extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.muted,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(LucideIcons.radio,
-                      color: AppColors.mutedForeground),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
-                      ),
+            Expanded(
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.muted,
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    Row(
+                    child: const Icon(LucideIcons.radio, color: AppColors.mutedForeground),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          code,
-                          style: textTheme.labelSmall?.copyWith(
-                            color: AppColors.mutedForeground,
+                          device.deviceName,
+                          style: textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(width: 8),
-                        Icon(batteryIcon, size: 12, color: batteryColor),
-                        const SizedBox(width: 2),
-                        Text(
-                          '$batteryLevel%',
-                          style: textTheme.labelSmall?.copyWith(
-                            color: batteryColor,
-                            fontSize: 10,
-                          ),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                device.deviceCode,
+                                style: textTheme.labelSmall?.copyWith(
+                                  color: AppColors.mutedForeground,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(batteryIcon, size: 12, color: batteryColor),
+                            const SizedBox(width: 2),
+                            Text(
+                              '$batteryLevel%',
+                              style: textTheme.labelSmall?.copyWith(
+                                color: batteryColor,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
+            const SizedBox(width: AppSpacing.sm),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.muted,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'Normal',
-                        style: textTheme.labelSmall?.copyWith(
-                          fontSize: 10,
-                          color: AppColors.mutedForeground,
-                        ),
-                      ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: statusBg,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    statusLabel,
+                    style: textTheme.labelSmall?.copyWith(
+                      fontSize: 10,
+                      color: statusColor,
                     ),
-                    const SizedBox(width: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade100,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'Terhubung',
-                        style: textTheme.labelSmall?.copyWith(
-                          fontSize: 10,
-                          color: Colors.green.shade800,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -519,4 +678,12 @@ class DashboardPage extends StatelessWidget {
       ),
     );
   }
-}
+
+  String _formatTimeAgo(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.inSeconds < 60) return 'Baru saja';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min lalu';
+    if (diff.inHours < 24) return '${diff.inHours} jam lalu';
+    return '${diff.inDays} hari lalu';
+  }
+}
