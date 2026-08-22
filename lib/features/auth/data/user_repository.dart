@@ -5,73 +5,55 @@ class UserRepository {
   UserRepository._();
 
   static final _client = SupabaseClientService.client;
+  static UserProfile? currentUser;
 
   static Future<UserProfile> register({
     required String name,
     required String phone,
   }) async {
-    final normalizedPhone = _normalizePhone(phone);
-
     try {
-      await _client.functions.invoke(
+      final res = await _client.functions.invoke(
         'register-user',
         body: {
           'name': name.trim(),
-          'phone': normalizedPhone,
+          'phone': phone.trim(),
         },
       );
+      
+      final data = res.data;
+      if (data == null || data['success'] != true || data['user'] == null) {
+        throw Exception(data?['message'] ?? 'Gagal membuat akun');
+      }
+      
+      final userProfile = UserProfile.fromJson(data['user']);
+      currentUser = userProfile;
+      return userProfile;
     } catch (e) {
       throw Exception('Gagal mendaftar: $e');
     }
-
-    final response = await _client
-        .from('user_profiles')
-        .select()
-        .eq('phone', normalizedPhone)
-        .maybeSingle();
-
-    if (response == null) {
-      throw Exception('Gagal mendapatkan profil pengguna.');
-    }
-
-    return UserProfile.fromJson(response);
   }
 
   static Future<UserProfile?> login({
     required String phone,
   }) async {
-    final normalizedPhone = _normalizePhone(phone);
-
-    final response = await _client
-        .from('user_profiles')
-        .select()
-        .eq('phone', normalizedPhone)
-        .maybeSingle();
-
-    if (response == null) {
+    try {
+      final res = await _client.functions.invoke(
+        'login-user',
+        body: {
+          'phone': phone.trim(),
+        },
+      );
+      
+      final data = res.data;
+      if (data == null || data['success'] != true || data['user'] == null) {
+        return null;
+      }
+      
+      final userProfile = UserProfile.fromJson(data['user']);
+      currentUser = userProfile;
+      return userProfile;
+    } catch (e) {
       return null;
     }
-
-    return UserProfile.fromJson(response);
-  }
-
-  static String _normalizePhone(String phone) {
-    var value = phone.trim();
-
-    if (value.startsWith('+62')) {
-      return value;
-    }
-
-    if (value.startsWith('62')) {
-      return '+$value';
-    }
-
-    if (value.startsWith('0')) {
-      return '+62${value.substring(1)}';
-    }
-
-    throw const FormatException(
-      'Format nomor telepon tidak valid.',
-    );
   }
 }

@@ -1,5 +1,10 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:tagana_app/core/theme/app_colors.dart';
+import 'package:tagana_app/features/auth/data/user_repository.dart';
 
 enum StatusTone { success, warning, neutral }
 
@@ -76,11 +81,13 @@ class ConnectionSuccessPage extends StatefulWidget {
     this.helperText =
         'Konfigurasikan WiFi dari dashboard untuk mengirim data ke server secara otomatis.',
     this.onContinue,
+    this.bleDevice,
   });
 
   final String deviceName;
   final String deviceId;
   final bool isOnline;
+  final BluetoothDevice? bleDevice;
 
   /// Rows shown in the "Ringkasan Perangkat" card. If empty, a sensible
   final List<DeviceSummaryItem> summaryItems;
@@ -99,6 +106,11 @@ class _ConnectionSuccessPageState extends State<ConnectionSuccessPage>
   late final AnimationController _popController;
   late final Animation<double> _popScale;
 
+  String _batteryStatus = 'Menunggu...';
+  String _gpsStatus = 'Menunggu...';
+  String _wifiStatus = 'Menunggu...';
+  StreamSubscription? _bleSub;
+
   @override
   void initState() {
     super.initState();
@@ -108,18 +120,89 @@ class _ConnectionSuccessPageState extends State<ConnectionSuccessPage>
     );
     _popScale = CurvedAnimation(parent: _popController, curve: Curves.elasticOut);
     _popController.forward();
+
+    // Catat aktivitas BLE terhubung ke Supabase (fire-and-forget, tidak blok UI)
+    _logBleConnected();
+    _initBle();
+  }
+
+  Future<void> _initBle() async {
+    final dev = widget.bleDevice;
+    if (dev == null) return;
+    try {
+      final services = await dev.discoverServices();
+      for (final s in services) {
+        if (s.uuid.str.toLowerCase() == '4fafc201-1fb5-459e-8fcc-c5c9c331914b') {
+          for (final c in s.characteristics) {
+            if (c.uuid.str.toLowerCase() == 'beb5483e-36e1-4688-b7f5-ea07361b26a9') {
+              await c.setNotifyValue(true);
+              _bleSub = c.onValueReceived.listen((val) {
+                if (!mounted) return;
+                try {
+                  final jsonStr = String.fromCharCodes(val);
+                  final data = jsonDecode(jsonStr);
+                  setState(() {
+                    _batteryStatus = data['battery']?.toString() ?? '-';
+                    _gpsStatus = (data['gps_valid'] == true) ? 'Tersedia' : 'Mencari sinyal...';
+                    final ssid = data['ssid']?.toString();
+                    _wifiStatus = (ssid == null || ssid == 'Belum Ada WiFi' || ssid.startsWith('Offline')) ? 'Belum dikonfigurasi' : ssid;
+                  });
+                } catch (_) {}
+              });
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  /// Mencatat event `ble_connected` ke tabel device_activities.
+  /// Cari device berdasarkan deviceId (MAC address BLE) atau
+  /// device_name yang mengandung nama perangkat.
+  Future<void> _logBleConnected() async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      // Cari device berdasarkan device_name yang cocok dengan nama BLE
+      // Nama BLE: "TAGANA_0001" → device_name: "Tas Siaga TGN_0001"
+      // Kita gunakan filter contains pada device_name
+      final deviceResult = await supabase
+          .from('devices')
+          .select('id, device_code')
+          .eq('user_id', UserRepository.currentUser?.id ?? '')
+          .order('updated_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (deviceResult == null) return;
+
+      await supabase.from('device_activities').insert({
+        'device_id': deviceResult['id'] as String,
+        'type': 'ble_connected',
+        'title': 'BLE Terhubung',
+        'description':
+            'Perangkat ${deviceResult['device_code']} terhubung melalui Bluetooth',
+        'metadata': {
+          'ble_device_id': widget.deviceId,
+          'ble_device_name': widget.deviceName,
+        },
+      });
+    } catch (_) {
+      // Tidak kritis — logging gagal tidak mengganggu UX
+    }
   }
 
   @override
   void dispose() {
+    _bleSub?.cancel();
     _popController.dispose();
     super.dispose();
   }
 
   List<DeviceSummaryItem> get _items {
     if (widget.summaryItems.isNotEmpty) return widget.summaryItems;
-    return const [
-      DeviceSummaryItem(
+    return [
+      const DeviceSummaryItem(
         icon: Icons.bluetooth,
         label: 'Bluetooth',
         value: 'Terhubung',
@@ -128,21 +211,21 @@ class _ConnectionSuccessPageState extends State<ConnectionSuccessPage>
       DeviceSummaryItem(
         icon: Icons.battery_std,
         label: 'Baterai',
-        value: '85%',
-        tone: StatusTone.success,
+        value: _batteryStatus,
+        tone: _batteryStatus == 'Menunggu...' ? StatusTone.neutral : StatusTone.success,
         asPill: false,
       ),
       DeviceSummaryItem(
         icon: Icons.location_on_outlined,
         label: 'GPS',
-        value: 'Tersedia',
-        tone: StatusTone.success,
+        value: _gpsStatus,
+        tone: _gpsStatus == 'Tersedia' ? StatusTone.success : StatusTone.warning,
       ),
       DeviceSummaryItem(
         icon: Icons.wifi,
         label: 'WiFi',
-        value: 'Belum dikonfigurasi',
-        tone: StatusTone.warning,
+        value: _wifiStatus,
+        tone: _wifiStatus == 'Belum dikonfigurasi' || _wifiStatus == 'Menunggu...' ? StatusTone.warning : StatusTone.success,
       ),
     ];
   }

@@ -81,6 +81,11 @@ class _DeviceVerificationPageState extends State<DeviceVerificationPage> {
 
   Future<void> _runVerification() async {
     setState(() => _status = _VerifyStatus.checking);
+    
+    // Tambahkan delay minimal agar status loading (spinner) terlihat oleh user, 
+    // sehingga tombol "Coba Lagi" terasa berfungsi.
+    await Future.delayed(const Duration(milliseconds: 500));
+    
     final verify = widget.verifyDevice ?? _mockVerify;
     final result = await verify(widget.deviceCode);
     if (!mounted) return;

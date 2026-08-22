@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:tagana_app/core/theme/app_colors.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:tagana_app/core/supabase/supabase_client.dart';
-
 enum _DeviceCodeStatus { empty, valid, invalid }
 
 class EnterDevicePage extends StatefulWidget {
@@ -16,7 +14,6 @@ class EnterDevicePage extends StatefulWidget {
 class _VerifyingDevicePageState extends State<EnterDevicePage> {
   final _codeController = TextEditingController();
   static final RegExp _codePattern = RegExp(r'^TGN_\d{4}$');
-  bool _isLoading = false;
 
   _DeviceCodeStatus get _status {
     final code = _codeController.text.trim().toUpperCase();
@@ -34,40 +31,12 @@ class _VerifyingDevicePageState extends State<EnterDevicePage> {
     super.dispose();
   }
 
-  void _onConnect() async {
+  void _onConnect() {
     if (!_canSubmit) return;
-    
     final deviceCode = _codeController.text.trim().toUpperCase();
-    
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      await SupabaseClientService.client.functions.invoke(
-        'pair-device',
-        body: {
-          'device_code': deviceCode,
-          'device_name': 'Tas Siaga $deviceCode',
-        },
-      );
-
-      if (!mounted) return;
-      // Navigate to dashboard immediately or to the device verification success page
-      // Because we skip bluetooth connection for now
-      context.go('/dashboard');
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal menghubungkan perangkat: $e')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
+    // Navigasi ke halaman verifikasi perangkat dengan kode yang dimasukkan.
+    // Proses pairing ke Supabase dilakukan di verifying_device.dart.
+    context.go('/verifying-device/$deviceCode');
   }
 
   @override
@@ -369,23 +338,17 @@ class _VerifyingDevicePageState extends State<EnterDevicePage> {
           ),
           elevation: 0,
         ),
-        child: _isLoading
-            ? const SizedBox(
-                width: 20, 
-                height: 20, 
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-              )
-            : const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Hubungkan Perangkat',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(width: 8),
-                  Icon(Icons.wifi, size: 18),
-                ],
-              ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Hubungkan Perangkat',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+            SizedBox(width: 8),
+            Icon(Icons.arrow_forward, size: 18),
+          ],
+        ),
       ),
     );
   }

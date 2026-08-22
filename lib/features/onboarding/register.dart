@@ -47,7 +47,10 @@ class _RegisterWhatsAppPageState extends State<RegisterPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Terjadi kesalahan: $e')),
+        SnackBar(
+          content: Text('Gagal membuat akun: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.red,
+        ),
       );
     } finally {
       if (mounted) {
@@ -245,99 +248,63 @@ class _RegisterWhatsAppPageState extends State<RegisterPage> {
           ),
         ),
         const SizedBox(height: 6),
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-              decoration: BoxDecoration(
-                color: AppColors.input,
-                border: Border.all(color: AppColors.border),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('🇮🇩', style: TextStyle(fontSize: 17)),
-                  const SizedBox(width: 6),
-                  Text(
-                    '+62',
-                    style: TextStyle(
-                      color: AppColors.foreground,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: AppColors.input,
+            border: Border.all(
+              color: _isPhoneValid ? AppColors.primary : AppColors.border,
+              width: _isPhoneValid ? 2 : 1,
+            ),
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  onChanged: (_) => setState(() {}),
+                  style: TextStyle(
+                    color: AppColors.foreground,
+                    fontSize: 15,
+                    letterSpacing: 0.5,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: '081234567890',
+                    hintStyle: TextStyle(
+                      color: AppColors.mutedForeground,
+                    ),
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 16,
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    Icons.keyboard_arrow_down,
-                    size: 16,
-                    color: AppColors.mutedForeground,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: AppColors.input,
-                  border: Border.all(
-                    color: _isPhoneValid ? AppColors.primary : AppColors.border,
-                    width: _isPhoneValid ? 2 : 1,
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _phoneController,
-                        keyboardType: TextInputType.phone,
-                        onChanged: (_) => setState(() {}),
-                        style: TextStyle(
-                          color: AppColors.foreground,
-                          fontSize: 15,
-                          letterSpacing: 0.5,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: '812-3456-7890',
-                          hintStyle: TextStyle(
-                            color: AppColors.mutedForeground,
-                          ),
-                          filled: false,
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          disabledBorder: InputBorder.none,
-                          errorBorder: InputBorder.none,
-                          focusedErrorBorder: InputBorder.none,
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (_isPhoneValid)
-                      Container(
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          color: AppColors.success,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.check,
-                          size: 11,
-                          color: Colors.white,
-                        ),
-                      ),
-                  ],
                 ),
               ),
-            ),
-          ],
+              if (_isPhoneValid)
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: AppColors.success,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check,
+                    size: 11,
+                    color: Colors.white,
+                  ),
+                ),
+            ],
+          ),
         ),
         if (_isPhoneValid) ...[
           const SizedBox(height: 6),

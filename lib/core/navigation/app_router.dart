@@ -27,6 +27,7 @@ import '../../features/onboarding/enter_device.dart';
 import '../../features/onboarding/verifying_device.dart';
 import '../../features/onboarding/bluetooth_connection.dart';
 import '../../features/onboarding/connection_success.dart';
+import '../services/device_service.dart';
 import 'app_shell.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -57,24 +58,16 @@ final appRouter = GoRouter(
         final deviceCode = state.pathParameters['deviceCode'] ?? 'UNKNOWN';
         return DeviceVerificationPage(
           deviceCode: deviceCode,
-          onContinue: () => context.go('/bluetooth/$deviceCode?auto=1'),
+          // Verifikasi nyata: cek kode di Supabase dan pasangkan ke user
+          verifyDevice: DeviceService.verifyAndPairDevice,
+          // Setelah verifikasi sukses, lanjut ke halaman BLE scan
+          onContinue: () => context.go('/bluetooth/$deviceCode'),
         );
       },
     ),
     GoRoute(
       path: '/bluetooth/:deviceCode',
       builder: (context, state) {
-        final deviceCode = state.pathParameters['deviceCode'] ?? 'UNKNOWN';
-        final auto =
-            state.uri.queryParameters['auto'] == '1' ||
-            state.uri.queryParameters['auto'] == 'true';
-        // If auto=true, immediately continue to the success page to
-        // simulate a connected device (useful for demo/dev builds).
-        if (auto) {
-          // schedule navigation after the current microtask so builder can finish
-          Future.microtask(() => context.go('/connection-success/$deviceCode'));
-        }
-
         return BluetoothConnectionPage(
           deviceNamePrefix: 'TAGANA',
           onConnected: (info) =>
@@ -96,6 +89,7 @@ final appRouter = GoRouter(
         return ConnectionSuccessPage(
           deviceName: info?.name ?? 'TAGANA-001',
           deviceId: info?.deviceId ?? deviceId,
+          bleDevice: info?.device,
           onContinue: () => context.go('/dashboard'),
         );
       },
