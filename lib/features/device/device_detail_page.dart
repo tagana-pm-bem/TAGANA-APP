@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -183,6 +185,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
 
   Widget _buildMapSection(TextTheme textTheme, DeviceDetailData data) {
     final device = data.device;
+    final location = data.location;
     final isConnected = _isConnected;
 
     return Container(
@@ -203,20 +206,9 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
           SizedBox(
             height: 180,
             width: double.infinity,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.network(
-                  'https://lh3.googleusercontent.com/aida-public/AB6AXuC77G_NKapS1CcpDm-SMfE9zmVvNJkUGXXNhOCGFIVXgEtfMrY44e3RTbLBfMYxDSF1aJxey8IdbbayWtASjfJJe9x_WpDmV1rnoYEnLx5dnbjV_E-rh_jL9UjZTZvXkiWekNGsVrVrLa5q3JvhbONiGJyEYrqb3uaZE5v7D-vdSXyF4mViZLWUUMKQRWNNIBaiE_70hl8Iy80iHApEBdkn4xMvyCb1Ovzz7kiTpOTtIPBHqKAiSM1j',
-                  fit: BoxFit.cover,
-                  color: Colors.white.withOpacity(0.8),
-                  colorBlendMode: BlendMode.dstIn,
-                ),
-                const Center(
-                  child: Icon(LucideIcons.mapPin, color: AppColors.primary, size: 40),
-                ),
-              ],
-            ),
+            child: location != null
+                ? _buildMap(location)
+                : _buildMapPlaceholder(textTheme),
           ),
           Padding(
             padding: const EdgeInsets.all(AppSpacing.md),
@@ -271,6 +263,63 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMap(DeviceLocationInfo location) {
+    final point = latlong.LatLng(location.latitude.toDouble(), location.longitude.toDouble());
+
+    return FlutterMap(
+      options: MapOptions(
+        initialCenter: point,
+        initialZoom: 15,
+        interactionOptions: const InteractionOptions(
+          flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag | InteractiveFlag.doubleTapZoom,
+        ),
+      ),
+      children: [
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.example.tagana_app',
+        ),
+        MarkerLayer(
+          markers: [
+            Marker(
+              point: point,
+              width: 40,
+              height: 40,
+              child: Icon(LucideIcons.mapPin, color: AppColors.primary, size: 40),
+            ),
+          ],
+        ),
+        RichAttributionWidget(
+          attributions: [
+            TextSourceAttribution(
+              'OpenStreetMap contributors',
+              onTap: () => launchUrl(Uri.parse('https://openstreetmap.org/copyright')),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMapPlaceholder(TextTheme textTheme) {
+    return Container(
+      color: AppColors.muted,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(LucideIcons.mapPin, color: AppColors.mutedForeground, size: 32),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Belum ada data lokasi',
+              style: textTheme.bodySmall?.copyWith(color: AppColors.mutedForeground),
+            ),
+          ],
+        ),
       ),
     );
   }
