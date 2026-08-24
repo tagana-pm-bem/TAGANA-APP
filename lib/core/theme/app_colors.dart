@@ -10,6 +10,7 @@ abstract final class AppColors {
   static const background = Color(0xFFFAFAFA);
   static const foreground = Color(0xFF0A0A0A);
   static const secondary = Color.fromARGB(255, 237, 237, 237);
+  static const secondaryForeground = Color(0xFF0A0A0A);
  
   // Surface
   static const card = Color(0xFFFFFFFF);

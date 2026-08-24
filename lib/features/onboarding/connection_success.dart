@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -130,6 +131,10 @@ class _ConnectionSuccessPageState extends State<ConnectionSuccessPage>
     final dev = widget.bleDevice;
     if (dev == null) return;
     try {
+      // Wajib request MTU besar agar JSON panjang dari ESP32 tidak terpotong
+      if (Platform.isAndroid) {
+        await dev.requestMtu(256);
+      }
       final services = await dev.discoverServices();
       for (final s in services) {
         if (s.uuid.str.toLowerCase() == '4fafc201-1fb5-459e-8fcc-c5c9c331914b') {

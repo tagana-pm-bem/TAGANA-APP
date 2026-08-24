@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:math' as math;
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'dart:async';
+import '../../core/services/ble_telemetry_service.dart';
 
 class _HtmlColors {
   static const background = Color(0xFFF9F9F9);
@@ -16,10 +19,11 @@ class _HtmlColors {
 }
 
 class WifiConnectingPage extends StatefulWidget {
-  const WifiConnectingPage({required this.deviceId, required this.ssid, super.key});
+  const WifiConnectingPage({required this.deviceId, required this.ssid, required this.password, super.key});
   
   final String deviceId;
   final String ssid;
+  final String password;
 
   @override
   State<WifiConnectingPage> createState() => _WifiConnectingPageState();
@@ -42,12 +46,41 @@ class _WifiConnectingPageState extends State<WifiConnectingPage> with TickerProv
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
 
-    // Navigasi otomatis setelah 3 detik
-    Future.delayed(const Duration(seconds: 3), () {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _sendWifiConfig();
+    });
+  }
+
+  Future<void> _sendWifiConfig() async {
+    try {
+      final deviceCode = BleTelemetryService.instance.connectedDeviceCode;
+      if (!BleTelemetryService.instance.isConnected || deviceCode == null) {
+        throw Exception("Bluetooth belum terhubung! Harap hubungkan BLE terlebih dahulu.");
+      }
+
+      // 1. Kirim format WIFI:ssid:password
+      final payload = "WIFI:${widget.ssid}:${widget.password}";
+      await BleTelemetryService.instance.sendRawCommand(payload);
+      
+      // 2. Beri waktu ESP32 untuk restart dan memproses koneksi Wi-Fi
+      // ESP32 sangat cepat terkoneksi, jadi kita set delay simulasi UI yang pas (misal 5 detik)
+      // agar animasi berputar terlihat natural sebelum pindah halaman.
+      await Future.delayed(const Duration(seconds: 5));
+
       if (mounted) {
         context.pushReplacement('/device/${widget.deviceId}/wifi-connected?ssid=${Uri.encodeComponent(widget.ssid)}');
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Gagal mengirim konfigurasi: $e'),
+          backgroundColor: Colors.red,
+        ));
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) context.pop();
+        });
+      }
+    }
   }
 
   @override

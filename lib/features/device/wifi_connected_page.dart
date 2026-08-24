@@ -222,6 +222,7 @@ class _WifiConnectedPageState extends State<WifiConnectedPage> with SingleTicker
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Row(
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Container(
                                           width: 8,
@@ -247,6 +248,7 @@ class _WifiConnectedPageState extends State<WifiConnectedPage> with SingleTicker
                                   icon: Icons.sync,
                                   label: 'Sinkronisasi',
                                   valueWidget: const Row(
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(Icons.cloud_done, size: 16, color: _HtmlColors.primary),
                                       SizedBox(width: 4),
@@ -309,6 +311,7 @@ class _WifiConnectedPageState extends State<WifiConnectedPage> with SingleTicker
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 20, color: _HtmlColors.outline),
             const SizedBox(width: 8),
@@ -322,7 +325,14 @@ class _WifiConnectedPageState extends State<WifiConnectedPage> with SingleTicker
             ),
           ],
         ),
-        valueWidget,
+        Flexible(
+          child: DefaultTextStyle(
+            style: const TextStyle(
+              overflow: TextOverflow.ellipsis,
+            ),
+            child: valueWidget,
+          ),
+        ),
       ],
     );
   }

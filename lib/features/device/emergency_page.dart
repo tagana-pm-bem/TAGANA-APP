@@ -4,14 +4,48 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/services/ble_telemetry_service.dart';
 
-class EmergencyPage extends StatelessWidget {
+class EmergencyPage extends StatefulWidget {
   const EmergencyPage({
     required this.deviceId,
     super.key,
   });
 
   final String deviceId;
+
+  @override
+  State<EmergencyPage> createState() => _EmergencyPageState();
+}
+
+class _EmergencyPageState extends State<EmergencyPage> {
+  bool _isBuzzerOn = false;
+
+  void _toggleBuzzer() {
+    if (!BleTelemetryService.instance.isConnected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bluetooth belum terhubung!')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isBuzzerOn = !_isBuzzerOn;
+    });
+
+    try {
+      // Firmware ESP32 mengharapkan string mentah "BUZZER" sebagai perintah toggle
+      BleTelemetryService.instance.sendRawCommand('BUZZER');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_isBuzzerOn ? 'Buzzer Dinyalakan' : 'Buzzer Dimatikan')),
+      );
+    } catch (e) {
+      setState(() => _isBuzzerOn = !_isBuzzerOn); // Revert on failure
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal mengirim perintah: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +111,7 @@ class EmergencyPage extends StatelessWidget {
             ),
           ),
           Text(
-            '$deviceId | TGN_0001', // Example static mapped ID
+            '${widget.deviceId} | TGN_0001', // Example static mapped ID
             style: textTheme.labelSmall?.copyWith(
               color: AppColors.mutedForeground,
             ),
@@ -387,19 +421,37 @@ class EmergencyPage extends StatelessWidget {
             style: textTheme.bodyMedium?.copyWith(color: AppColors.mutedForeground),
           ),
           const SizedBox(height: AppSpacing.lg),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () => context.push('/device/$deviceId/ble'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo, // AppColors.brand replacement
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => context.push('/device/${widget.deviceId}/ble'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.indigo,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(LucideIcons.bluetooth, size: 18),
+                  label: const Text('Hubungkan BLE'),
+                ),
               ),
-              icon: const Icon(LucideIcons.bluetooth, size: 18),
-              label: const Text('Hubungkan BLE'),
-            ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _toggleBuzzer,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isBuzzerOn ? AppColors.destructive : AppColors.card,
+                    foregroundColor: _isBuzzerOn ? AppColors.destructiveForeground : AppColors.destructive,
+                    side: const BorderSide(color: AppColors.destructive),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: Icon(_isBuzzerOn ? LucideIcons.volumeX : LucideIcons.volume2, size: 18),
+                  label: Text(_isBuzzerOn ? 'Matikan Buzzer' : 'Bunyikan Buzzer'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -493,7 +545,7 @@ class EmergencyPage extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () => context.push('/device/$deviceId/hotspot'),
+              onPressed: () => context.push('/device/${widget.deviceId}/hotspot'),
               style: OutlinedButton.styleFrom(
                 backgroundColor: AppColors.muted,
                 foregroundColor: AppColors.foreground,
@@ -511,146 +563,191 @@ class EmergencyPage extends StatelessWidget {
   }
 
   Widget _buildStatusDataBLESection(TextTheme textTheme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return ValueListenableBuilder<bool>(
+      valueListenable: BleTelemetryService.instance.isConnectedNotifier,
+      builder: (context, isConnected, child) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Status Data BLE',
-              style: textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppColors.foreground,
-              ),
-            ),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Icon(LucideIcons.bluetoothConnected, color: AppColors.success, size: 16),
-                const SizedBox(width: 4),
                 Text(
-                  'Terhubung',
-                  style: textTheme.labelSmall?.copyWith(color: AppColors.success),
+                  'Status Data BLE',
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.foreground,
+                  ),
+                ),
+                Row(
+                  children: [
+                    Icon(
+                      isConnected ? LucideIcons.bluetoothConnected : LucideIcons.bluetoothOff, 
+                      color: isConnected ? AppColors.success : AppColors.mutedForeground, 
+                      size: 16
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isConnected ? 'Terhubung' : 'Terputus',
+                      style: textTheme.labelSmall?.copyWith(color: isConnected ? AppColors.success : AppColors.mutedForeground),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Container(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          decoration: BoxDecoration(
-            color: AppColors.foreground, // Dark background
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: AppColors.destructive,
-                      shape: BoxShape.circle,
-                    ),
+            const SizedBox(height: AppSpacing.xs),
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: AppColors.foreground, // Dark background
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
-              Text(
-                '> Data diterima: 10:42:31',
-                style: textTheme.bodySmall?.copyWith(
-                  fontFamily: 'monospace',
-                  color: AppColors.muted,
-                ),
+              child: StreamBuilder<Map<String, dynamic>>(
+                stream: BleTelemetryService.instance.telemetryStream,
+                builder: (context, snapshot) {
+                  final data = snapshot.data;
+                  final time = data != null ? "${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}:${DateTime.now().second.toString().padLeft(2, '0')}" : "--:--:--";
+                  final waterVal = data != null ? data['water'] : 0;
+                  // Asumsikan > 1000 artinya basah (batas banjir ESP32 = 1900 max)
+                  final isWaterDetect = waterVal > 1000; 
+                  
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: isConnected ? (data != null ? AppColors.success : Colors.orange) : AppColors.destructive,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        '> Data diterima: $time',
+                        style: textTheme.bodySmall?.copyWith(
+                          fontFamily: 'monospace',
+                          color: AppColors.muted,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '> Water Sensor = ${data == null ? 'Unknown' : (isWaterDetect ? 'Banjir' : 'Kering')} ($waterVal)',
+                        style: textTheme.bodySmall?.copyWith(
+                          fontFamily: 'monospace',
+                          color: AppColors.muted,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '> Battery = ${data != null ? data['battery'] : 'Unknown'}',
+                        style: textTheme.bodySmall?.copyWith(
+                          fontFamily: 'monospace',
+                          color: AppColors.muted,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '> Syncing logs... ${isConnected ? 'OK' : 'Waiting'}',
+                        style: textTheme.bodySmall?.copyWith(
+                          fontFamily: 'monospace',
+                          color: AppColors.muted,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      const Divider(color: Colors.white30, height: 1),
+                      const SizedBox(height: AppSpacing.md),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: InkWell(
+                          onTap: () {
+                            if (isConnected) {
+                              BleTelemetryService.instance.disconnect();
+                            } else {
+                              BleTelemetryService.instance.connect(widget.deviceId);
+                            }
+                          },
+                          child: Text(
+                            isConnected ? 'Putuskan BLE' : 'Hubungkan BLE',
+                            style: textTheme.labelSmall?.copyWith(
+                              color: AppColors.muted,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }
               ),
-              const SizedBox(height: 4),
-              Text(
-                '> Water Sensor = Aktif',
-                style: textTheme.bodySmall?.copyWith(
-                  fontFamily: 'monospace',
-                  color: AppColors.muted,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '> Syncing logs...',
-                style: textTheme.bodySmall?.copyWith(
-                  fontFamily: 'monospace',
-                  color: AppColors.muted,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              const Divider(color: Colors.white30, height: 1),
-              const SizedBox(height: AppSpacing.md),
-              Align(
-                alignment: Alignment.centerRight,
-                child: InkWell(
-                  onTap: () {},
-                  child: Text(
-                    'Putuskan BLE',
-                    style: textTheme.labelSmall?.copyWith(
-                      color: AppColors.muted,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      }
     );
   }
 
   Widget _buildDataEmergencySummary(TextTheme textTheme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-          child: Text(
-            'Data Emergency',
-            style: textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: AppColors.foreground,
-            ),
-          ),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
+    return StreamBuilder<Map<String, dynamic>>(
+      stream: BleTelemetryService.instance.telemetryStream,
+      builder: (context, snapshot) {
+        final data = snapshot.data;
+        final waterVal = data != null ? data['water'] : 0;
+        final isFlood = waterVal > 1000;
+        final wifiSSID = data != null ? data['ssid'] : 'Unknown';
+        final time = data != null ? "${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}:${DateTime.now().second.toString().padLeft(2, '0')}" : "--:--:--";
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Text(
+                'Data Emergency',
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.foreground,
+                ),
               ),
-            ],
-          ),
-          child: Column(
-            children: [
-              _buildSummaryRow(textTheme, 'Status Water Sensor', 'Air Terdeteksi', true),
-              const Divider(height: 1),
-              _buildSummaryRow(textTheme, 'Status Perangkat', 'Emergency', true, isStripe: true),
-              const Divider(height: 1),
-              _buildSummaryRow(textTheme, 'Koneksi Wi-Fi', 'Tidak Tersedia', false),
-              const Divider(height: 1),
-              _buildSummaryRow(textTheme, 'Data Terakhir', '10:42:31', false, isStripe: true),
-            ],
-          ),
-        ),
-      ],
+            ),
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  _buildSummaryRow(textTheme, 'Status Water Sensor', data == null ? 'Menunggu...' : (isFlood ? 'Air Terdeteksi' : 'Normal'), isFlood),
+                  const Divider(height: 1),
+                  _buildSummaryRow(textTheme, 'Status Perangkat', data == null ? 'Offline' : (isFlood ? 'Emergency' : 'Aman'), isFlood, isStripe: true),
+                  const Divider(height: 1),
+                  _buildSummaryRow(textTheme, 'Koneksi Wi-Fi', wifiSSID.toString(), false),
+                  const Divider(height: 1),
+                  _buildSummaryRow(textTheme, 'Data Terakhir', time, false, isStripe: true),
+                ],
+              ),
+            ),
+          ],
+        );
+      }
     );
   }
 
