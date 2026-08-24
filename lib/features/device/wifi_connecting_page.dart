@@ -96,7 +96,7 @@ class _WifiConnectingPageState extends State<WifiConnectingPage> with TickerProv
       backgroundColor: _HtmlColors.background,
       body: Stack(
         children: [
-          // Background abstract elements
+
           Positioned(
             top: -50,
             left: -50,
@@ -157,12 +157,12 @@ class _WifiConnectingPageState extends State<WifiConnectingPage> with TickerProv
                     ),
                     const SizedBox(height: 40),
                     
-                    // Connection visualizer
+
                     _buildVisualizer(),
                     
                     const SizedBox(height: 40),
                     
-                    // Progress Steps
+
                     _buildProgressSteps(),
                   ],
                 ),
@@ -205,7 +205,7 @@ class _WifiConnectingPageState extends State<WifiConnectingPage> with TickerProv
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Ripple 1
+
           FadeTransition(
             opacity: Tween<double>(begin: 0.8, end: 0.0).animate(_pulseController),
             child: ScaleTransition(
@@ -218,7 +218,7 @@ class _WifiConnectingPageState extends State<WifiConnectingPage> with TickerProv
               ),
             ),
           ),
-          // Hub
+
           Container(
             width: 80,
             height: 80,

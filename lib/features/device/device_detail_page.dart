@@ -23,11 +23,13 @@ class DeviceDetailPage extends StatefulWidget {
   const DeviceDetailPage({
     required this.deviceId,
     this.isOnline = true,
+    this.initialDeviceCode,
     super.key,
   });
 
   final String deviceId;
   final bool isOnline;
+  final String? initialDeviceCode;
 
   @override
   State<DeviceDetailPage> createState() => _DeviceDetailPageState();
@@ -41,6 +43,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
   bool _isBleConnecting = false;
   bool _isBleConnected = false;
   StreamSubscription? _bleTelemetrySub;
+  Timer? _pollingTimer;
 
   @override
   void initState() {
@@ -51,10 +54,15 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
       onChange: _load,
     );
 
-    // Langganan ke stream Global BLE
+
     _isBleConnected = BleTelemetryService.instance.isConnectedNotifier.value;
     BleTelemetryService.instance.isConnectedNotifier.addListener(_onBleConnectionChanged);
     _bleTelemetrySub = BleTelemetryService.instance.telemetryStream.listen(_onBleDataReceived);
+
+    // ponytail: auto-refresh tiap 2 detik jika supabase realtime blm narik UI otomatis
+    _pollingTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (mounted && !_isBleConnected) _load();
+    });
   }
 
   void _onBleConnectionChanged() {
@@ -70,6 +78,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
 
   @override
   void dispose() {
+    _pollingTimer?.cancel();
     final channel = _channel;
     if (channel != null) {
       DeviceService.unsubscribeDeviceStatus(channel);
@@ -88,7 +97,13 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
     });
 
     try {
-      final deviceCode = _data?.device.deviceCode ?? widget.deviceId;
+      // Prioritaskan deviceCode dari data Supabase, jika offline/null ambil dari parameter route
+      final deviceCode = _data?.device.deviceCode ?? widget.initialDeviceCode;
+      
+      if (deviceCode == null) {
+        throw Exception("Kode alat (TGN_XXXX) belum tersedia. Harap sinkronisasi internet sekali saja.");
+      }
+      
       await BleTelemetryService.instance.connect(deviceCode);
 
       if (mounted) {
@@ -141,7 +156,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
       final double? lat = gpsValid ? double.tryParse(bleData['lat']?.toString() ?? '') : null;
       final double? lng = gpsValid ? double.tryParse(bleData['lng']?.toString() ?? '') : null;
       
-      // Update data model UI dengan data BLE
+
       final currentDevice = _data!.device;
       
       _data = DeviceDetailData(

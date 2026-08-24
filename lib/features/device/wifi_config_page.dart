@@ -68,10 +68,10 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
       // Hapus jika sudah ada (agar bisa dipindah ke paling atas)
       _wifiHistory.removeWhere((item) => item['ssid'] == ssid);
       
-      // Tambah di awal list
+
       _wifiHistory.insert(0, {'ssid': ssid, 'password': password});
       
-      // Batasi maksimal 5 riwayat
+
       if (_wifiHistory.length > 5) {
         _wifiHistory = _wifiHistory.sublist(0, 5);
       }
@@ -98,7 +98,7 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
       return;
     }
 
-    // Cek apakah ada device bluetooth yang terhubung
+
     final connectedDevices = FlutterBluePlus.connectedDevices;
     if (connectedDevices.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -107,10 +107,10 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
       return;
     }
 
-    // Simpan ke riwayat lokal sebelum navigasi
+
     await _saveWifiToHistory(_ssidController.text, _passwordController.text);
 
-    // Navigasi langsung ke halaman proses menghubungkan
+
     if (mounted) {
       setState(() => _isConnecting = false);
       context.push(

@@ -433,7 +433,10 @@ class _DevicesPageState extends State<DevicesPage> {
     final timeAgo = isBleConnected ? 'Realtime (BLE)' : _formatTimeAgo(device.lastSeenAt);
 
     return InkWell(
-      onTap: () => context.push('/device/${device.id}', extra: isConnected),
+      onTap: () => context.push('/device/${device.id}', extra: {
+        'isOnline': isConnected,
+        'deviceCode': device.deviceCode,
+      }),
       borderRadius: BorderRadius.circular(12),
       child: Container(
           padding: const EdgeInsets.all(AppSpacing.md),

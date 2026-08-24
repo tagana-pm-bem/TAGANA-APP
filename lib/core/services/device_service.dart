@@ -286,42 +286,43 @@ class DeviceService {
     required String deviceId,
     required void Function() onChange,
   }) {
+    // Note: Filter dihapus karena filtering UUID di Supabase Realtime sering bermasalah (casing/format).
+    // Karena jumlah device per user kecil, me-reload saat ada perubahan di tabel tersebut sudah cukup efisien.
     final channel = SupabaseClientService.client
         .channel('device-detail-$deviceId')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'device_status',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'device_id',
-            value: deviceId,
-          ),
-          callback: (payload) => onChange(),
+          callback: (payload) {
+            print('[REALTIME] device_status berubah! Payload: ${payload.newRecord}');
+            final changedDeviceId = payload.newRecord['device_id'] ?? payload.oldRecord['device_id'];
+            if (changedDeviceId?.toString().toLowerCase() == deviceId.toLowerCase()) onChange();
+          },
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'device_locations',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'device_id',
-            value: deviceId,
-          ),
-          callback: (payload) => onChange(),
+          callback: (payload) {
+            print('[REALTIME] device_locations berubah!');
+            final changedDeviceId = payload.newRecord['device_id'] ?? payload.oldRecord['device_id'];
+            if (changedDeviceId?.toString().toLowerCase() == deviceId.toLowerCase()) onChange();
+          },
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'device_activities',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'device_id',
-            value: deviceId,
-          ),
-          callback: (payload) => onChange(),
+          callback: (payload) {
+            print('[REALTIME] device_activities berubah!');
+            final changedDeviceId = payload.newRecord['device_id'] ?? payload.oldRecord['device_id'];
+            if (changedDeviceId?.toString().toLowerCase() == deviceId.toLowerCase()) onChange();
+          },
         )
-        .subscribe();
+        .subscribe((status, [error]) {
+           print('[REALTIME] Status channel device-detail: $status');
+        });
 
     return channel;
   }
