@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/app_header.dart';
 import '../dashboard/models/dashboard_models.dart';
+import '../../core/services/ble_telemetry_service.dart';
 
 enum _DeviceFilter { semua, terhubung, tidakTerhubung, peringatan }
 
@@ -36,6 +37,11 @@ class _DevicesPageState extends State<DevicesPage> {
     _searchController.addListener(() {
       setState(() => _query = _searchController.text.trim().toLowerCase());
     });
+    BleTelemetryService.instance.isConnectedNotifier.addListener(_onBleStatusChanged);
+  }
+
+  void _onBleStatusChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -45,6 +51,7 @@ class _DevicesPageState extends State<DevicesPage> {
       DeviceService.unsubscribeDeviceStatus(channel);
     }
     _searchController.dispose();
+    BleTelemetryService.instance.isConnectedNotifier.removeListener(_onBleStatusChanged);
     super.dispose();
   }
 
@@ -416,11 +423,14 @@ class _DevicesPageState extends State<DevicesPage> {
     TextTheme textTheme,
     DeviceWithStatus device,
   ) {
-    final isConnected = device.isConnected;
+    final isBleConnected = BleTelemetryService.instance.isConnected && 
+                           BleTelemetryService.instance.connectedDeviceCode == device.deviceCode;
+
+    final isConnected = isBleConnected || device.isConnected;
     final isWarning = _isWarning(device);
-    final icon = isConnected ? LucideIcons.radio : LucideIcons.wifiOff;
-    final statusText = _statusText(device);
-    final timeAgo = _formatTimeAgo(device.lastSeenAt);
+    final icon = isBleConnected ? LucideIcons.bluetooth : (isConnected ? LucideIcons.radio : LucideIcons.wifiOff);
+    final statusText = isBleConnected ? 'Terhubung (Bluetooth)' : (isConnected ? _statusText(device) : 'Tidak Terhubung');
+    final timeAgo = isBleConnected ? 'Realtime (BLE)' : _formatTimeAgo(device.lastSeenAt);
 
     return InkWell(
       onTap: () => context.push('/device/${device.id}', extra: isConnected),
@@ -462,7 +472,7 @@ class _DevicesPageState extends State<DevicesPage> {
                           icon,
                           color: isWarning
                               ? AppColors.destructive
-                              : (isConnected ? AppColors.primary : AppColors.mutedForeground),
+                              : (isBleConnected ? Colors.blue : (isConnected ? AppColors.primary : AppColors.mutedForeground)),
                         ),
                       ),
                       const SizedBox(width: AppSpacing.md),
@@ -494,14 +504,14 @@ class _DevicesPageState extends State<DevicesPage> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
-                                    'Terhubung',
+                                    isBleConnected ? 'Bluetooth' : 'Internet',
                                     style: textTheme.labelSmall?.copyWith(
                                       fontSize: 10,
-                                      color: Colors.green.shade800,
+                                      color: isBleConnected ? Colors.blue.shade800 : Colors.green.shade800,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 4),
+                                ),const SizedBox(width: 4),
                               ],
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import '../../core/services/ble_telemetry_service.dart';
 
 // Definisi warna berdasarkan Tailwind config dari HTML
 class _HtmlColors {
@@ -31,6 +35,53 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
   final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isConnecting = false;
+  
+  List<Map<String, String>> _wifiHistory = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWifiHistory();
+  }
+
+  Future<void> _loadWifiHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final historyList = prefs.getStringList('wifi_history') ?? [];
+      setState(() {
+        _wifiHistory = historyList.map((item) {
+          final decoded = jsonDecode(item) as Map<String, dynamic>;
+          return {
+            'ssid': decoded['ssid']?.toString() ?? '',
+            'password': decoded['password']?.toString() ?? '',
+          };
+        }).toList();
+      });
+    } catch (e) {
+      print('Gagal memuat riwayat wifi: $e');
+    }
+  }
+
+  Future<void> _saveWifiToHistory(String ssid, String password) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // Hapus jika sudah ada (agar bisa dipindah ke paling atas)
+      _wifiHistory.removeWhere((item) => item['ssid'] == ssid);
+      
+      // Tambah di awal list
+      _wifiHistory.insert(0, {'ssid': ssid, 'password': password});
+      
+      // Batasi maksimal 5 riwayat
+      if (_wifiHistory.length > 5) {
+        _wifiHistory = _wifiHistory.sublist(0, 5);
+      }
+      
+      final historyList = _wifiHistory.map((item) => jsonEncode(item)).toList();
+      await prefs.setStringList('wifi_history', historyList);
+    } catch (e) {
+      print('Gagal menyimpan riwayat wifi: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -47,16 +98,31 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
       return;
     }
 
+    // Cek apakah ada device bluetooth yang terhubung
+    final connectedDevices = FlutterBluePlus.connectedDevices;
+    if (connectedDevices.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bluetooth belum terhubung ke perangkat. Silakan hubungkan dulu.')),
+      );
+      return;
+    }
+
+    // Simpan ke riwayat lokal sebelum navigasi
+    await _saveWifiToHistory(_ssidController.text, _passwordController.text);
+
     // Navigasi langsung ke halaman proses menghubungkan
     if (mounted) {
       setState(() => _isConnecting = false);
-      context.push('/device/${widget.deviceId}/wifi-connecting?ssid=${Uri.encodeComponent(_ssidController.text)}');
+      context.push(
+        '/device/${widget.deviceId}/wifi-connecting?ssid=${Uri.encodeComponent(_ssidController.text)}&password=${Uri.encodeComponent(_passwordController.text)}'
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: _HtmlColors.surface,
       appBar: _buildAppBar(context),
       body: Stack(
@@ -152,42 +218,47 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
             child: const Icon(Icons.router, color: _HtmlColors.primary),
           ),
           const SizedBox(width: 16.0),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'DEVICE ID',
-                style: TextStyle(
-                  fontFamily: 'Plus Jakarta Sans',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: _HtmlColors.onSurfaceVariant,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'DEVICE ID',
+                  style: TextStyle(
+                    fontFamily: 'Plus Jakarta Sans',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _HtmlColors.onSurfaceVariant,
+                  ),
                 ),
-              ),
-              Row(
-                children: [
-                  Text(
-                    widget.deviceId,
-                    style: const TextStyle(
-                      fontFamily: 'Plus Jakarta Sans',
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: _HtmlColors.onSurface,
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        widget.deviceId,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: _HtmlColors.onSurface,
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 4.0),
-                  const Text(
-                    '(TGN_0001)',
-                    style: TextStyle(
-                      fontFamily: 'Plus Jakarta Sans',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
-                      color: _HtmlColors.onSurfaceVariant,
+                    const SizedBox(width: 4.0),
+                    Text(
+                      '(${BleTelemetryService.instance.connectedDeviceCode ?? 'Unknown'})',
+                      style: const TextStyle(
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        color: _HtmlColors.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -291,6 +362,45 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
               color: _HtmlColors.onSurfaceVariant,
             ),
           ),
+          if (_wifiHistory.isNotEmpty) ...[
+            const SizedBox(height: 16.0),
+            const Text(
+              'Riwayat Wi-Fi (Tap untuk mengisi otomatis):',
+              style: TextStyle(
+                fontFamily: 'Plus Jakarta Sans',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: _HtmlColors.primary,
+              ),
+            ),
+            const SizedBox(height: 8.0),
+            Wrap(
+              spacing: 8.0,
+              runSpacing: 8.0,
+              children: _wifiHistory.map((wifi) {
+                return ActionChip(
+                  label: Text(
+                    wifi['ssid'] ?? '',
+                    style: const TextStyle(
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  avatar: const Icon(Icons.history, size: 16, color: _HtmlColors.primary),
+                  backgroundColor: _HtmlColors.primaryContainer.withOpacity(0.1),
+                  side: BorderSide.none,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  onPressed: () {
+                    setState(() {
+                      _ssidController.text = wifi['ssid'] ?? '';
+                      _passwordController.text = wifi['password'] ?? '';
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ],
           const SizedBox(height: 20.0),
           TextField(
             controller: _ssidController,
@@ -397,7 +507,7 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
             const SizedBox(width: 8.0),
             const Expanded(
               child: Text(
-                'Wi-Fi adalah koneksi utama. Jika tidak tersedia saat darurat, perangkat akan otomatis menggunakan BLE atau Hotspot.',
+                'Wi-Fi adalah koneksi utama. Jika tidak tersedia saat darurat, perangkat akan otomatis menggunakan BLE atau Hotspot untuk mengirimkan data.',
                 style: TextStyle(
                   fontFamily: 'Plus Jakarta Sans',
                   fontSize: 14,

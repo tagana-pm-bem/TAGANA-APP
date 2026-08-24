@@ -197,7 +197,8 @@ final appRouter = GoRouter(
       builder: (context, state) {
         final deviceId = state.pathParameters['id']!;
         final ssid = state.uri.queryParameters['ssid'] ?? '';
-        return WifiConnectingPage(deviceId: deviceId, ssid: ssid);
+        final password = state.uri.queryParameters['password'] ?? '';
+        return WifiConnectingPage(deviceId: deviceId, ssid: ssid, password: password);
       },
     ),
     GoRoute(

@@ -28,8 +28,14 @@ class DeviceWithStatus {
     this.lastSeenAt,
   });
 
-  bool get isConnected =>
-      status == 'online' || status == 'warning' || status == 'critical';
+  bool get isConnected {
+    // Timeout 6 menit seperti di DeviceDetail
+    if (lastSeenAt != null) {
+      final difference = DateTime.now().toUtc().difference(lastSeenAt!.toUtc());
+      if (difference.inMinutes > 6) return false;
+    }
+    return status == 'online' || status == 'warning' || status == 'critical';
+  }
 
   factory DeviceWithStatus.fromJson(Map<String, dynamic> json) {
     // device_status bisa balik sebagai object atau list-of-1 tergantung

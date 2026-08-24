@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +11,8 @@ import '../../core/services/device_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import 'models/device_detail_data.dart';
+import '../../core/services/ble_telemetry_service.dart';
+import '../../features/dashboard/models/dashboard_models.dart';
 
 const _kMonths = [
   'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
@@ -35,6 +38,9 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
   bool _isLoading = true;
   String? _errorMessage;
   RealtimeChannel? _channel;
+  bool _isBleConnecting = false;
+  bool _isBleConnected = false;
+  StreamSubscription? _bleTelemetrySub;
 
   @override
   void initState() {
@@ -44,6 +50,22 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
       deviceId: widget.deviceId,
       onChange: _load,
     );
+
+    // Langganan ke stream Global BLE
+    _isBleConnected = BleTelemetryService.instance.isConnectedNotifier.value;
+    BleTelemetryService.instance.isConnectedNotifier.addListener(_onBleConnectionChanged);
+    _bleTelemetrySub = BleTelemetryService.instance.telemetryStream.listen(_onBleDataReceived);
+  }
+
+  void _onBleConnectionChanged() {
+    if (mounted) {
+      setState(() {
+        _isBleConnected = BleTelemetryService.instance.isConnectedNotifier.value;
+        if (!_isBleConnected) {
+          _isBleConnecting = false; // Reset loading state if disconnected
+        }
+      });
+    }
   }
 
   @override
@@ -52,7 +74,102 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
     if (channel != null) {
       DeviceService.unsubscribeDeviceStatus(channel);
     }
+    BleTelemetryService.instance.isConnectedNotifier.removeListener(_onBleConnectionChanged);
+    _bleTelemetrySub?.cancel();
     super.dispose();
+  }
+
+  Future<void> _connectToBle() async {
+    if (_isBleConnecting || _isBleConnected) return;
+
+    setState(() {
+      _isBleConnecting = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final deviceCode = _data?.device.deviceCode ?? widget.deviceId;
+      await BleTelemetryService.instance.connect(deviceCode);
+
+      if (mounted) {
+        setState(() {
+          _isBleConnecting = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Berhasil terhubung ke Bluetooth Telemetri!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isBleConnecting = false;
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Koneksi BLE Gagal: $_errorMessage'),
+            backgroundColor: AppColors.destructive,
+          ),
+        );
+      }
+    }
+  }
+
+  void _onBleDataReceived(Map<String, dynamic> bleData) {
+    if (!mounted || _data == null) return;
+    
+    setState(() {
+      // Data dari BLE (JSON format di ESP32 html_ui/ble_setup)
+      // "battery": "100% (2183)", "water": 450, "lat": null, "lng": null, "gps_valid": false, "buzzer_manual": false
+      
+      final String batStr = bleData['battery']?.toString() ?? '0%';
+      final batPercentStr = batStr.split('%').first;
+      final int batPercent = int.tryParse(batPercentStr) ?? 0;
+      
+      final waterRaw = double.tryParse(bleData['water']?.toString() ?? '0') ?? 0;
+      // Konversi RAW (1900 max) ke CM (maks 4.0 cm) seperti di ESP32
+      double waterCm = (waterRaw / 1900.0) * 4.0;
+      if (waterCm > 4.0) waterCm = 4.0;
+      if (waterCm < 0.0) waterCm = 0.0;
+      
+      final bool isFlood = waterRaw > 50; // Threshold baru dari ESP32 config.h
+
+      final bool gpsValid = bleData['gps_valid'] == true || bleData['gps_valid'] == 'true';
+      final double? lat = gpsValid ? double.tryParse(bleData['lat']?.toString() ?? '') : null;
+      final double? lng = gpsValid ? double.tryParse(bleData['lng']?.toString() ?? '') : null;
+      
+      // Update data model UI dengan data BLE
+      final currentDevice = _data!.device;
+      
+      _data = DeviceDetailData(
+        device: DeviceDetail(
+          id: currentDevice.id,
+          deviceCode: currentDevice.deviceCode,
+          deviceName: currentDevice.deviceName,
+          firmwareVersion: currentDevice.firmwareVersion,
+          isActive: currentDevice.isActive,
+          registeredAt: currentDevice.registeredAt,
+          status: 'Bluetooth Connected',
+          waterLevel: waterCm,
+          batteryLevel: batPercent,
+          signalStrength: -40, // Asumsi BLE kuat jika terkoneksi
+          isFloodDetected: isFlood,
+          lastSeenAt: DateTime.now(),
+        ),
+        location: gpsValid && lat != null && lng != null
+            ? DeviceLocationInfo(
+                latitude: lat,
+                longitude: lng,
+                accuracy: 10.0,
+                recordedAt: DateTime.now(),
+              )
+            : _data!.location,
+        activities: _data!.activities,
+      );
+    });
   }
 
   Future<void> _load() async {
@@ -73,7 +190,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
     }
   }
 
-  bool get _isConnected => _data?.device.isConnected ?? widget.isOnline;
+  bool get _isConnected => _isBleConnected || (_data?.device.isConnected ?? widget.isOnline);
 
   @override
   Widget build(BuildContext context) {
@@ -251,7 +368,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      isConnected ? 'Terhubung' : 'Offline',
+                      _isBleConnected ? 'Terhubung (BLE)' : (isConnected ? 'Terhubung' : 'Offline'),
                       style: textTheme.labelSmall?.copyWith(
                         color: isConnected ? AppColors.success : AppColors.destructive,
                         fontWeight: FontWeight.bold,
@@ -388,7 +505,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
               icon: LucideIcons.droplets,
               label: 'Water Lvl',
               value: waterValue,
-              unit: device.waterLevel != null ? 'm' : null,
+              unit: device.waterLevel != null ? 'cm' : null,
               status: waterStatus,
               statusColor: waterStatusColor,
               iconColor: AppColors.primary,
@@ -801,6 +918,44 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (!isConnected) ..._buildOfflineBanner(context, textTheme),
+        
+        // [PONYTAIL FIX]: Tombol Bluetooth SELALU DIMUNCULKAN di luar banner offline.
+        // Karena meskipun status Supabase masih nyangkut di "Online", pengguna harus tetap bisa 
+        // membajak koneksinya lewat Bluetooth kapan saja mereka mau (Mode Taktis Instan).
+        if (!_isBleConnected)
+          ElevatedButton.icon(
+            onPressed: _isBleConnecting ? null : _connectToBle,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.primaryForeground,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            icon: _isBleConnecting
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Icon(LucideIcons.bluetooth, size: 18),
+            label: Text(
+              _isBleConnecting ? 'Mencari Perangkat...' : 'Hubungkan Bluetooth (Mode Taktis)',
+              style: const TextStyle(fontWeight: FontWeight.bold)
+            ),
+          ),
+        if (!_isBleConnected) const SizedBox(height: AppSpacing.sm),
+
+        // [PONYTAIL FIX]: Selalu tampilkan tombol setting Wi-Fi.
+        // Konfigurasi Wi-Fi dikirim via Bluetooth, jadi tombol ini harus selalu ada.
+        ElevatedButton.icon(
+          onPressed: () => context.push('/device/${widget.deviceId}/wifi-config'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.secondary, // Ganti warna agar tidak terlalu merah/destruktif
+            foregroundColor: AppColors.secondaryForeground,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          icon: const Icon(LucideIcons.wifi, size: 18),
+          label: const Text('Pengaturan Wi-Fi (via BLE)', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+
         _buildEmergencyBtn(context),
         const SizedBox(height: AppSpacing.sm),
         _buildTestConnectionBtn(context),
@@ -843,18 +998,6 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
             ),
           ],
         ),
-      ),
-      const SizedBox(height: AppSpacing.sm),
-      ElevatedButton.icon(
-        onPressed: () => context.push('/device/${widget.deviceId}/wifi-config'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.destructive,
-          foregroundColor: AppColors.destructiveForeground,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        icon: const Icon(LucideIcons.wifi, size: 18),
-        label: const Text('Hubungkan ke Internet', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       const SizedBox(height: AppSpacing.sm),
     ];

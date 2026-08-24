@@ -28,8 +28,15 @@ class DeviceDetail {
     this.lastSeenAt,
   });
 
-  bool get isConnected =>
-      status == 'online' || status == 'warning' || status == 'critical';
+  bool get isConnected {
+    // Karena ESP32 mengirim HTTP POST secara stateless, server tidak tahu saat Wi-Fi putus mendadak.
+    // Jika tidak ada kabar selama lebih dari 6 menit (karena interval normal 5 menit), anggap Offline.
+    if (lastSeenAt != null) {
+      final difference = DateTime.now().toUtc().difference(lastSeenAt!.toUtc());
+      if (difference.inMinutes > 6) return false;
+    }
+    return status == 'online' || status == 'warning' || status == 'critical';
+  }
 
   factory DeviceDetail.fromJson(Map<String, dynamic> json) {
     final rawStatus = json['device_status'];
