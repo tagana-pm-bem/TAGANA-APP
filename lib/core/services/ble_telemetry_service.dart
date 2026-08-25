@@ -37,7 +37,7 @@ class BleTelemetryService {
       await disconnect();
       print('[BLE] Mencari perangkat dengan nama: $targetName');
 
-      // Check if already connected
+      // Check if already connected to this app
       for (var d in FlutterBluePlus.connectedDevices) {
         if (d.platformName == targetName) {
           _device = d;
@@ -45,7 +45,22 @@ class BleTelemetryService {
         }
       }
 
-      // If not connected, scan for it
+      // Check if already connected/paired via OS Settings
+      if (_device == null) {
+        try {
+          final systemDevices = await FlutterBluePlus.systemDevices(
+            [Guid("4fafc201-1fb5-459e-8fcc-c5c9c331914b")]
+          );
+          for (var d in systemDevices) {
+            if (d.platformName == targetName || d.platformName.isEmpty) {
+              _device = d;
+              break;
+            }
+          }
+        } catch (_) {}
+      }
+
+      // If not connected, scan for it using Service UUID
       if (_device == null) {
         if (FlutterBluePlus.isScanningNow) {
           await FlutterBluePlus.stopScan();
@@ -55,7 +70,11 @@ class BleTelemetryService {
         
         final scanSub = FlutterBluePlus.onScanResults.listen((results) {
           for (var r in results) {
-            if (r.device.platformName == targetName || r.advertisementData.advName == targetName) {
+            // Karena kita scan pakai withServices, SEMUA hasil pasti alat Tagana.
+            // Kita terima jika namanya cocok, atau namanya disembunyikan OS (kosong).
+            if (r.device.platformName == targetName || 
+                r.advertisementData.advName == targetName ||
+                r.device.platformName.isEmpty) {
               deviceFound = true;
               _device = r.device;
               FlutterBluePlus.stopScan();
@@ -64,9 +83,10 @@ class BleTelemetryService {
           }
         });
 
+        // Scan berdasarkan Service UUID
         await FlutterBluePlus.startScan(
-          withNames: [targetName],
-          timeout: const Duration(seconds: 10),
+          withServices: [Guid("4fafc201-1fb5-459e-8fcc-c5c9c331914b")],
+          timeout: const Duration(seconds: 5), // Percepat timeout
         );
         
         await FlutterBluePlus.isScanning.where((val) => val == false).first;

@@ -48,7 +48,7 @@ class _WifiConnectedPageState extends State<WifiConnectedPage> with SingleTicker
       backgroundColor: _HtmlColors.surface,
       body: Stack(
         children: [
-          // Background decorations
+
           Positioned(
             top: -50,
             left: -50,
@@ -84,7 +84,7 @@ class _WifiConnectedPageState extends State<WifiConnectedPage> with SingleTicker
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // Success Icon with Pulse
+
                           AnimatedBuilder(
                             animation: _pulseController,
                             builder: (context, child) {
@@ -138,7 +138,7 @@ class _WifiConnectedPageState extends State<WifiConnectedPage> with SingleTicker
                           ),
                           const SizedBox(height: 40),
 
-                          // Device Info Card
+
                           Container(
                             padding: const EdgeInsets.all(16.0),
                             decoration: BoxDecoration(
@@ -154,7 +154,7 @@ class _WifiConnectedPageState extends State<WifiConnectedPage> with SingleTicker
                             ),
                             child: Column(
                               children: [
-                                // Header
+
                                 Row(
                                   children: [
                                     Container(
@@ -197,7 +197,7 @@ class _WifiConnectedPageState extends State<WifiConnectedPage> with SingleTicker
                                 const Divider(height: 1, color: _HtmlColors.surfaceVariant),
                                 const SizedBox(height: 16),
                                 
-                                // Details
+
                                 _buildDetailItem(
                                   icon: Icons.wifi,
                                   label: 'Jaringan',
@@ -273,7 +273,7 @@ class _WifiConnectedPageState extends State<WifiConnectedPage> with SingleTicker
                   ),
                 ),
                 
-                // Bottom Button
+
                 Padding(
                   padding: const EdgeInsets.all(24.0),
                   child: SizedBox(

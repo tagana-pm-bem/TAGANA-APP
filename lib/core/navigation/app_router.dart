@@ -153,8 +153,22 @@ final appRouter = GoRouter(
       path: '/device/:id',
       builder: (context, state) {
         final deviceId = state.pathParameters['id']!;
-        final isOnline = state.extra is bool ? state.extra as bool : true;
-        return DeviceDetailPage(deviceId: deviceId, isOnline: isOnline);
+        bool isOnline = true;
+        String? deviceCode;
+
+        if (state.extra is bool) {
+          isOnline = state.extra as bool;
+        } else if (state.extra is Map<String, dynamic>) {
+          final extraMap = state.extra as Map<String, dynamic>;
+          isOnline = extraMap['isOnline'] as bool? ?? true;
+          deviceCode = extraMap['deviceCode'] as String?;
+        }
+
+        return DeviceDetailPage(
+          deviceId: deviceId, 
+          isOnline: isOnline, 
+          initialDeviceCode: deviceCode
+        );
       },
     ),
     GoRoute(

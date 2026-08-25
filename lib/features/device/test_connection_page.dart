@@ -35,18 +35,18 @@ class TestConnectionPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Section
+
             Text('Uji Koneksi', style: textTheme.headlineLarge?.copyWith(color: AppColors.foreground, fontWeight: FontWeight.bold)),
             const SizedBox(height: AppSpacing.sm),
             Text('Periksa koneksi perangkat TAGANA', style: textTheme.bodyMedium?.copyWith(color: AppColors.mutedForeground)),
             const SizedBox(height: AppSpacing.lg),
-            // Device Status Section (replicated from HTML)
+
             _deviceStatusSection(textTheme),
             const SizedBox(height: AppSpacing.lg),
-            // Result State Section (Success placeholder)
+
             _resultStateSection(context, textTheme),
             const SizedBox(height: AppSpacing.lg),
-            // Connection Test Process
+
             _connectionProcessSection(textTheme),
           ],
         ),
@@ -195,7 +195,7 @@ class TestConnectionPage extends StatelessWidget {
             child: const Text('Mulai Uji Koneksi'),
           ),
           const SizedBox(height: AppSpacing.md),
-          // Steps list
+
           _stepItem(textTheme, number: 1, title: 'Memeriksa perangkat', done: true),
           _stepItem(textTheme, number: 2, title: 'Memeriksa Bluetooth LE', done: true),
           _stepItem(textTheme, number: 3, title: 'Memeriksa Wi‑Fi', active: true),
