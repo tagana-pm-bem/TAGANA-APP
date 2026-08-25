@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
@@ -99,6 +100,12 @@ class BleTelemetryService {
 
       print('[BLE] Menghubungkan ke ${_device!.platformName}...');
       await _device!.connect(timeout: const Duration(seconds: 10), autoConnect: false);
+      
+      if (Platform.isAndroid) {
+        try {
+          await _device!.requestMtu(256);
+        } catch (_) {}
+      }
 
       // Listen for disconnection
       _connectionSubscription = _device!.connectionState.listen((state) {

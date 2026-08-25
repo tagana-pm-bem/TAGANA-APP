@@ -8,6 +8,7 @@ import '../../features/device/devices_page.dart';
 import '../../features/device/test_connection_page.dart';
 import '../../features/device/emergency_page.dart';
 import '../../features/device/hotspot_page.dart';
+import '../../features/device/webview_page.dart';
 import '../../features/device/wifi_config_page.dart';
 import '../../features/device/wifi_connecting_page.dart';
 import '../../features/device/wifi_connected_page.dart';
@@ -190,6 +191,13 @@ final appRouter = GoRouter(
       builder: (context, state) {
         final deviceId = state.pathParameters['id']!;
         return HotspotPage(deviceId: deviceId);
+      },
+    ),
+    GoRoute(
+      path: '/device/:id/local-web',
+      builder: (context, state) {
+        final deviceId = state.pathParameters['id']!;
+        return LocalWebViewPage(deviceId: deviceId);
       },
     ),
     GoRoute(

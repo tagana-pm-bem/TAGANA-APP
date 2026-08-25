@@ -49,6 +49,8 @@ dependencies:
   supabase_flutter: ^2.15.4
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
+  webview_flutter: ^4.10.0
+  wifi_iot: ^0.3.19+1
 
 dev_dependencies:
   flutter_test:

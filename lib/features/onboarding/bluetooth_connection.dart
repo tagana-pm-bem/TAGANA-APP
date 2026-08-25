@@ -259,7 +259,7 @@ class _BluetoothConnectionPageState extends State<BluetoothConnectionPage>
 
     FlutterBluePlus.startScan(
       timeout: const Duration(seconds: 15),
-      androidUsesFineLocation: true,
+      androidUsesFineLocation: false,
     ).catchError((_) {
       if (!mounted) return;
       setState(() {
@@ -296,13 +296,15 @@ class _BluetoothConnectionPageState extends State<BluetoothConnectionPage>
     try {
       await info.device.connect(
         autoConnect: false,
+        mtu: null,
         timeout: const Duration(seconds: 12),
       );
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('BLE Connect Error: $e\n$st');
       if (!mounted) return;
       setState(() {
         _step = ConnectionStep.failed;
-        _errorMessage = 'Gagal menghubungkan ke perangkat.';
+        _errorMessage = 'Gagal terhubung: ${e.toString().split('\n').first}';
       });
     }
   }
