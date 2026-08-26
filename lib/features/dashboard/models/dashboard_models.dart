@@ -32,7 +32,7 @@ class DeviceWithStatus {
     // Timeout 6 menit seperti di DeviceDetail
     if (lastSeenAt != null) {
       final difference = DateTime.now().toUtc().difference(lastSeenAt!.toUtc());
-      if (difference.inMinutes > 6) return false;
+      if (difference.inMinutes > 35) return false;
     }
     return status == 'online' || status == 'warning' || status == 'critical';
   }

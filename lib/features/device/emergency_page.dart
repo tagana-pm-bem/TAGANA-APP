@@ -34,13 +34,12 @@ class _EmergencyPageState extends State<EmergencyPage> {
     });
 
     try {
-      // Firmware ESP32 mengharapkan string mentah "BUZZER" sebagai perintah toggle
       BleTelemetryService.instance.sendRawCommand('BUZZER');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_isBuzzerOn ? 'Buzzer Dinyalakan' : 'Buzzer Dimatikan')),
       );
     } catch (e) {
-      setState(() => _isBuzzerOn = !_isBuzzerOn); // Revert on failure
+      setState(() => _isBuzzerOn = !_isBuzzerOn); 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal mengirim perintah: $e')),
       );
@@ -54,37 +53,49 @@ class _EmergencyPageState extends State<EmergencyPage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: _buildAppBar(context, textTheme),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.only(
-              left: AppSpacing.md,
-              right: AppSpacing.md,
-              top: AppSpacing.md,
-              bottom: 100, // Padding for footer
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildEmergencyStatusCard(textTheme),
-                const SizedBox(height: AppSpacing.lg),
-                _buildPenyebabSection(textTheme),
-                const SizedBox(height: AppSpacing.lg),
-                _buildKomunikasiDaruratSection(context, textTheme),
-                const SizedBox(height: AppSpacing.lg),
-                _buildStatusDataBLESection(textTheme),
-                const SizedBox(height: AppSpacing.lg),
-                _buildDataEmergencySummary(textTheme),
-              ],
-            ),
-          ),
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: _buildFooter(textTheme),
-          ),
-        ],
+      body: StreamBuilder<Map<String, dynamic>>(
+        stream: BleTelemetryService.instance.telemetryStream,
+        builder: (context, snapshot) {
+          final data = snapshot.data;
+          final waterRaw = double.tryParse(data?['water']?.toString() ?? '0') ?? 0;
+          // Threshold banjir dari konfigurasi ESP32 (nilai > 50 / 1000 tergantung kalibrasi)
+          final isFlood = waterRaw > 50; 
+          final wifiSSID = data?['ssid']?.toString();
+          final isWifiAvailable = wifiSSID != null && wifiSSID.isNotEmpty && wifiSSID != 'Unknown';
+
+          return Stack(
+            children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.only(
+                  left: AppSpacing.md,
+                  right: AppSpacing.md,
+                  top: AppSpacing.md,
+                  bottom: 100,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildEmergencyStatusCard(textTheme, isFlood, data),
+                    const SizedBox(height: AppSpacing.lg),
+                    _buildPenyebabSection(textTheme, isFlood, isWifiAvailable),
+                    const SizedBox(height: AppSpacing.lg),
+                    _buildKomunikasiDaruratSection(context, textTheme),
+                    const SizedBox(height: AppSpacing.lg),
+                    _buildStatusDataBLESection(textTheme),
+                    const SizedBox(height: AppSpacing.lg),
+                    _buildDataEmergencySummary(textTheme, isFlood, wifiSSID, data),
+                  ],
+                ),
+              ),
+              // Positioned(
+              //   bottom: 0,
+              //   left: 0,
+              //   right: 0,
+              //   child: _buildFooter(textTheme),
+              // ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -111,7 +122,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
             ),
           ),
           Text(
-            '${widget.deviceId} | TGN_0001', // Example static mapped ID
+            widget.deviceId,
             style: textTheme.labelSmall?.copyWith(
               color: AppColors.mutedForeground,
             ),
@@ -125,13 +136,19 @@ class _EmergencyPageState extends State<EmergencyPage> {
     );
   }
 
-  Widget _buildEmergencyStatusCard(TextTheme textTheme) {
+  Widget _buildEmergencyStatusCard(TextTheme textTheme, bool isFlood, Map<String, dynamic>? data) {
+    final timeStr = data != null 
+        ? "${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}"
+        : "--:--";
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
+        color: isFlood ? Colors.red.shade50 : Colors.green.shade50,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.destructive.withOpacity(0.2)),
+        border: Border.all(
+          color: isFlood ? AppColors.destructive.withOpacity(0.2) : AppColors.success.withOpacity(0.2),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.02),
@@ -146,9 +163,9 @@ class _EmergencyPageState extends State<EmergencyPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
-                LucideIcons.alertOctagon,
-                color: AppColors.destructive,
+              Icon(
+                isFlood ? LucideIcons.alertOctagon : LucideIcons.checkCircle2,
+                color: isFlood ? AppColors.destructive : AppColors.success,
                 size: 36,
               ),
               const SizedBox(width: AppSpacing.md),
@@ -157,17 +174,19 @@ class _EmergencyPageState extends State<EmergencyPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Emergency Mode Aktif',
+                      isFlood ? 'Emergency Mode Aktif' : 'Status Perangkat Normal',
                       style: textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: Colors.red.shade900,
+                        color: isFlood ? Colors.red.shade900 : Colors.green.shade900,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Perangkat mendeteksi kondisi darurat.',
+                      isFlood 
+                          ? 'Perangkat mendeteksi kondisi darurat air.' 
+                          : 'Tidak ada tanda-tanda bahaya terdeteksi.',
                       style: textTheme.bodyMedium?.copyWith(
-                        color: Colors.red.shade800,
+                        color: isFlood ? Colors.red.shade800 : Colors.green.shade800,
                       ),
                     ),
                   ],
@@ -190,14 +209,14 @@ class _EmergencyPageState extends State<EmergencyPage> {
                     Text(
                       'Pemicu:',
                       style: textTheme.labelMedium?.copyWith(
-                        color: Colors.red.shade700,
+                        color: isFlood ? Colors.red.shade700 : Colors.green.shade700,
                       ),
                     ),
                     Text(
-                      'Water Sensor mendeteksi air',
+                      isFlood ? 'Water Sensor mendeteksi air' : 'Aman (Normal)',
                       style: textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: Colors.red.shade900,
+                        color: isFlood ? Colors.red.shade900 : Colors.green.shade900,
                       ),
                     ),
                   ],
@@ -207,15 +226,15 @@ class _EmergencyPageState extends State<EmergencyPage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Waktu Kejadian:',
+                      'Penerimaan Terakhir:',
                       style: textTheme.labelMedium?.copyWith(
-                        color: Colors.red.shade700,
+                        color: isFlood ? Colors.red.shade700 : Colors.green.shade700,
                       ),
                     ),
                     Text(
-                      '17 Agustus 2026 · 10:42',
+                      data != null ? timeStr : 'Menunggu data...',
                       style: textTheme.bodyMedium?.copyWith(
-                        color: Colors.red.shade900,
+                        color: isFlood ? Colors.red.shade900 : Colors.green.shade900,
                       ),
                     ),
                   ],
@@ -228,14 +247,14 @@ class _EmergencyPageState extends State<EmergencyPage> {
     );
   }
 
-  Widget _buildPenyebabSection(TextTheme textTheme) {
+  Widget _buildPenyebabSection(TextTheme textTheme, bool isFlood, bool isWifiAvailable) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: AppSpacing.sm),
           child: Text(
-            'Penyebab',
+            'Analisis Penyebab',
             style: textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
               color: AppColors.foreground,
@@ -259,7 +278,9 @@ class _EmergencyPageState extends State<EmergencyPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Perangkat masuk ke mode komunikasi darurat karena mendeteksi air saat jaringan Wi-Fi tidak tersedia.',
+                isFlood
+                    ? 'Perangkat mendeteksi adanya ketinggian air melampaui batas aman.'
+                    : 'Semua sensor berfungsi normal dan berada dalam batas aman.',
                 style: textTheme.bodyMedium?.copyWith(
                   color: AppColors.mutedForeground,
                 ),
@@ -270,16 +291,16 @@ class _EmergencyPageState extends State<EmergencyPage> {
                   return constraints.maxWidth > 600
                       ? Row(
                           children: [
-                            Expanded(child: _buildCauseItem(textTheme, 'Water Sensor', 'Air terdeteksi', LucideIcons.droplet)),
+                            Expanded(child: _buildCauseItem(textTheme, 'Water Sensor', isFlood ? 'Air terdeteksi' : 'Normal', LucideIcons.droplet, isFlood)),
                             const SizedBox(width: AppSpacing.md),
-                            Expanded(child: _buildCauseItem(textTheme, 'Koneksi Wi-Fi', 'Tidak tersedia', LucideIcons.wifiOff)),
+                            Expanded(child: _buildCauseItem(textTheme, 'Koneksi Wi-Fi', isWifiAvailable ? 'Terhubung' : 'Tidak tersedia', LucideIcons.wifi, !isWifiAvailable)),
                           ],
                         )
                       : Column(
                           children: [
-                            _buildCauseItem(textTheme, 'Water Sensor', 'Air terdeteksi', LucideIcons.droplet),
+                            _buildCauseItem(textTheme, 'Water Sensor', isFlood ? 'Air terdeteksi' : 'Normal', LucideIcons.droplet, isFlood),
                             const SizedBox(height: AppSpacing.md),
-                            _buildCauseItem(textTheme, 'Koneksi Wi-Fi', 'Tidak tersedia', LucideIcons.wifiOff),
+                            _buildCauseItem(textTheme, 'Koneksi Wi-Fi', isWifiAvailable ? 'Terhubung' : 'Tidak tersedia', LucideIcons.wifi, !isWifiAvailable),
                           ],
                         );
                 },
@@ -291,7 +312,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
     );
   }
 
-  Widget _buildCauseItem(TextTheme textTheme, String title, String subtitle, IconData icon) {
+  Widget _buildCauseItem(TextTheme textTheme, String title, String subtitle, IconData icon, bool isAlert) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
@@ -301,7 +322,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
       ),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.destructive, size: 24),
+          Icon(icon, color: isAlert ? AppColors.destructive : AppColors.success, size: 24),
           const SizedBox(width: AppSpacing.sm),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -314,7 +335,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
                 subtitle,
                 style: textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: AppColors.destructive,
+                  color: isAlert ? AppColors.destructive : AppColors.success,
                 ),
               ),
             ],
@@ -417,7 +438,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Perangkat dapat mengirimkan data emergency langsung ke aplikasi melalui Bluetooth.',
+            'Perangkat mengirimkan data real-time langsung ke aplikasi melalui Bluetooth.',
             style: textTheme.bodyMedium?.copyWith(color: AppColors.mutedForeground),
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -599,7 +620,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
             Container(
               padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
-                color: AppColors.foreground, // Dark background
+                color: AppColors.foreground,
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
@@ -614,9 +635,8 @@ class _EmergencyPageState extends State<EmergencyPage> {
                 builder: (context, snapshot) {
                   final data = snapshot.data;
                   final time = data != null ? "${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}:${DateTime.now().second.toString().padLeft(2, '0')}" : "--:--:--";
-                  final waterVal = data != null ? data['water'] : 0;
-                  // Asumsikan > 1000 artinya basah (batas banjir ESP32 = 1900 max)
-                  final isWaterDetect = waterVal > 1000; 
+                  final waterVal = double.tryParse(data?['water']?.toString() ?? '0') ?? 0;
+                  final isWaterDetect = waterVal > 50; 
                   
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -643,7 +663,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '> Water Sensor = ${data == null ? 'Unknown' : (isWaterDetect ? 'Banjir' : 'Kering')} ($waterVal)',
+                        '> Water Sensor = ${data == null ? 'Unknown' : (isWaterDetect ? 'Banjir' : 'Kering')} (${waterVal.toStringAsFixed(0)})',
                         style: textTheme.bodySmall?.copyWith(
                           fontFamily: 'monospace',
                           color: AppColors.muted,
@@ -665,28 +685,6 @@ class _EmergencyPageState extends State<EmergencyPage> {
                           color: AppColors.muted,
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.md),
-                      const Divider(color: Colors.white30, height: 1),
-                      const SizedBox(height: AppSpacing.md),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: InkWell(
-                          onTap: () {
-                            if (isConnected) {
-                              BleTelemetryService.instance.disconnect();
-                            } else {
-                              BleTelemetryService.instance.connect(widget.deviceId);
-                            }
-                          },
-                          child: Text(
-                            isConnected ? 'Putuskan BLE' : 'Hubungkan BLE',
-                            style: textTheme.labelSmall?.copyWith(
-                              color: AppColors.muted,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ),
-                      ),
                     ],
                   );
                 }
@@ -698,56 +696,47 @@ class _EmergencyPageState extends State<EmergencyPage> {
     );
   }
 
-  Widget _buildDataEmergencySummary(TextTheme textTheme) {
-    return StreamBuilder<Map<String, dynamic>>(
-      stream: BleTelemetryService.instance.telemetryStream,
-      builder: (context, snapshot) {
-        final data = snapshot.data;
-        final waterVal = data != null ? data['water'] : 0;
-        final isFlood = waterVal > 1000;
-        final wifiSSID = data != null ? data['ssid'] : 'Unknown';
-        final time = data != null ? "${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}:${DateTime.now().second.toString().padLeft(2, '0')}" : "--:--:--";
-        
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: Text(
-                'Data Emergency',
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.foreground,
-                ),
-              ),
+  Widget _buildDataEmergencySummary(TextTheme textTheme, bool isFlood, String? wifiSSID, Map<String, dynamic>? data) {
+    final timeStr = data != null ? "${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}:${DateTime.now().second.toString().padLeft(2, '0')}" : "--:--:--";
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+          child: Text(
+            'Data Emergency',
+            style: textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppColors.foreground,
             ),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.card,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
               ),
-              child: Column(
-                children: [
-                  _buildSummaryRow(textTheme, 'Status Water Sensor', data == null ? 'Menunggu...' : (isFlood ? 'Air Terdeteksi' : 'Normal'), isFlood),
-                  const Divider(height: 1),
-                  _buildSummaryRow(textTheme, 'Status Perangkat', data == null ? 'Offline' : (isFlood ? 'Emergency' : 'Aman'), isFlood, isStripe: true),
-                  const Divider(height: 1),
-                  _buildSummaryRow(textTheme, 'Koneksi Wi-Fi', wifiSSID.toString(), false),
-                  const Divider(height: 1),
-                  _buildSummaryRow(textTheme, 'Data Terakhir', time, false, isStripe: true),
-                ],
-              ),
-            ),
-          ],
-        );
-      }
+            ],
+          ),
+          child: Column(
+            children: [
+              _buildSummaryRow(textTheme, 'Status Water Sensor', data == null ? 'Menunggu...' : (isFlood ? 'Air Terdeteksi' : 'Normal'), isFlood),
+              const Divider(height: 1),
+              _buildSummaryRow(textTheme, 'Status Perangkat', data == null ? 'Offline' : (isFlood ? 'Emergency' : 'Aman'), isFlood, isStripe: true),
+              const Divider(height: 1),
+              _buildSummaryRow(textTheme, 'Koneksi Wi-Fi', wifiSSID ?? 'Tidak terhubung', false),
+              const Divider(height: 1),
+              _buildSummaryRow(textTheme, 'Data Terakhir', timeStr, false, isStripe: true),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -792,8 +781,8 @@ class _EmergencyPageState extends State<EmergencyPage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 8,
-            height: 8,
+            width: 10,
+            height: 10,
             decoration: const BoxDecoration(
               color: AppColors.success,
               shape: BoxShape.circle,

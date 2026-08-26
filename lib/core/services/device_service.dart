@@ -4,6 +4,7 @@ import 'package:tagana_app/features/onboarding/verifying_device.dart';
 import 'package:tagana_app/features/auth/data/user_repository.dart';
 import '../../features/dashboard/models/dashboard_models.dart';
 import '../../features/device/models/device_detail_data.dart';
+import '../supabase/supabase_client.dart';
 
 /// Service untuk verifikasi dan pairing perangkat TAGANA ke akun pengguna,
 /// serta pengambilan data perangkat (list & detail) untuk kebutuhan UI.
@@ -350,5 +351,26 @@ class DeviceService {
       return 'Terjadi kesalahan server. Coba beberapa saat lagi.';
     }
     return raw.isNotEmpty ? raw : 'Verifikasi perangkat gagal. Coba lagi.';
+  }
+
+  static Future<void> logActivity({
+    required String deviceId,
+    required String type, // contoh: 'ble_connected', 'wifi_configured', dll
+    required String title,
+    String? description,
+  }) async {
+    try {
+      final client = SupabaseClientService.client;
+      await client.from('device_activities').insert({
+        'device_id': deviceId,
+        'type': type,
+        'title': title,
+        'description': description,
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+      });
+      print('[LOG] Aktivitas "$title" berhasil dicatat.');
+    } catch (e) {
+      print('[LOG] Gagal mencatat aktivitas: $e');
+    }
   }
 }

@@ -24,9 +24,11 @@ class _HotspotPageState extends State<HotspotPage> {
   String? _currentSsid;
   bool _isLoadingAction = false;
   bool _isScanning = false;
+  bool _manualConnectedOverride = false; // Flag darurat jika deteksi sistem gagal
   Timer? _pollingTimer;
 
-  bool get _isConnectedToTagana => _currentSsid == _kTaganaSSID;
+  // Status true jika terdeteksi otomatis ATAU di-override manual oleh relawan
+  bool get _isConnectedToTagana => (_currentSsid == _kTaganaSSID) || _manualConnectedOverride;
 
   @override
   void initState() {
@@ -164,6 +166,9 @@ class _HotspotPageState extends State<HotspotPage> {
                   _buildHotspotSection(context, textTheme),
                   const SizedBox(height: AppSpacing.sm),
                   _buildInfoNote(textTheme),
+                  const SizedBox(height: AppSpacing.sm),
+                  // Tombol bypass manual jika plugin gagal mendeteksi SSID
+                  Center(child: _buildManualOverrideOption(textTheme)),
                   if (_isConnectedToTagana) ...[
                     const SizedBox(height: AppSpacing.md),
                     _buildOpenWebButton(),
@@ -219,7 +224,6 @@ class _HotspotPageState extends State<HotspotPage> {
     );
   }
 
-  // ── Kartu status WiFi saat ini ──
   Widget _buildCurrentWifiCard(TextTheme textTheme) {
     final isConnected = _currentSsid != null && _currentSsid!.isNotEmpty;
     final statusColor =
@@ -267,7 +271,9 @@ class _HotspotPageState extends State<HotspotPage> {
                   )
                 else
                   Text(
-                    isConnected ? (_currentSsid ?? '—') : 'Tidak terhubung',
+                    _manualConnectedOverride
+                        ? 'Tagana-AP (Manual Override)'
+                        : (isConnected ? (_currentSsid ?? '—') : 'Tidak terhubung'),
                     style: textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: statusColor,
@@ -282,7 +288,6 @@ class _HotspotPageState extends State<HotspotPage> {
               ],
             ),
           ),
-          // Tombol putuskan WiFi (jika terhubung ke WiFi lain)
           if (isConnected && !_isConnectedToTagana)
             _isLoadingAction
                 ? const SizedBox(
@@ -307,7 +312,6 @@ class _HotspotPageState extends State<HotspotPage> {
     );
   }
 
-  // ── Daftar hotspot ──
   Widget _buildHotspotSection(BuildContext context, TextTheme textTheme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -472,6 +476,38 @@ class _HotspotPageState extends State<HotspotPage> {
     );
   }
 
+  Widget _buildManualOverrideOption(TextTheme textTheme) {
+    return TextButton.icon(
+      onPressed: () {
+        setState(() {
+          _manualConnectedOverride = !_manualConnectedOverride;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_manualConnectedOverride
+                ? 'Mode terhubung manual diaktifkan. Tombol Buka Web Lokal siap digunakan.'
+                : 'Mode terhubung manual dimatikan.'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      },
+      icon: Icon(
+        _manualConnectedOverride ? Icons.check_box : Icons.check_box_outline_blank,
+        size: 16,
+        color: AppColors.primary,
+      ),
+      label: Text(
+        _manualConnectedOverride
+            ? 'Reset Deteksi Otomatis'
+            : 'Sudah terhubung Tagana-AP di Pengaturan HP? Tap di sini',
+        style: textTheme.labelSmall?.copyWith(
+          color: AppColors.primary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
   void _showConnectGuide() {
     final isIos = Platform.isIOS;
     showDialog(
@@ -534,7 +570,6 @@ class _HotspotPageState extends State<HotspotPage> {
     );
   }
 
-  // ── Tombol buka WebView (muncul hanya saat konek ke Tagana-AP) ──
   Widget _buildOpenWebButton() {
     return SizedBox(
       width: double.infinity,

@@ -4,6 +4,8 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../../core/services/ble_telemetry_service.dart';
+import '../../core/services/device_service.dart';
+import '../../features/device/models/device_detail_data.dart';
 
 // Definisi warna berdasarkan Tailwind config dari HTML
 class _HtmlColors {
@@ -35,6 +37,8 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
   final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isConnecting = false;
+  bool _isLoadingDevice = true;
+  DeviceDetailData? _deviceData;
   
   List<Map<String, String>> _wifiHistory = [];
 
@@ -42,6 +46,25 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
   void initState() {
     super.initState();
     _loadWifiHistory();
+    _fetchDeviceStatusFromCloud();
+  }
+
+  Future<void> _fetchDeviceStatusFromCloud() async {
+    try {
+      final data = await DeviceService.fetchDeviceDetail(widget.deviceId);
+      if (mounted) {
+        setState(() {
+          _deviceData = data;
+          _isLoadingDevice = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingDevice = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadWifiHistory() async {
@@ -65,17 +88,11 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
   Future<void> _saveWifiToHistory(String ssid, String password) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      // Hapus jika sudah ada (agar bisa dipindah ke paling atas)
       _wifiHistory.removeWhere((item) => item['ssid'] == ssid);
-      
-
       _wifiHistory.insert(0, {'ssid': ssid, 'password': password});
-      
-
       if (_wifiHistory.length > 5) {
         _wifiHistory = _wifiHistory.sublist(0, 5);
       }
-      
       final historyList = _wifiHistory.map((item) => jsonEncode(item)).toList();
       await prefs.setStringList('wifi_history', historyList);
     } catch (e) {
@@ -98,24 +115,126 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
       return;
     }
 
-
-    final connectedDevices = FlutterBluePlus.connectedDevices;
-    if (connectedDevices.isEmpty) {
+    if (!BleTelemetryService.instance.isConnected) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bluetooth belum terhubung ke perangkat. Silakan hubungkan dulu.')),
+        const SnackBar(
+          content: Text('Bluetooth belum terhubung. Harap hubungkan Bluetooth terlebih dahulu untuk mengirim konfigurasi ke perangkat.'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
 
+    setState(() => _isConnecting = true);
 
-    await _saveWifiToHistory(_ssidController.text, _passwordController.text);
+    try {
+      // 1. KIRIM STRING KONFIGURASI KE ESP32 VIA BLE
+      final wifiCommand = 'WIFI:${_ssidController.text}:${_passwordController.text}';
+      await BleTelemetryService.instance.sendRawCommand(wifiCommand);
 
-
-    if (mounted) {
-      setState(() => _isConnecting = false);
-      context.push(
-        '/device/${widget.deviceId}/wifi-connecting?ssid=${Uri.encodeComponent(_ssidController.text)}&password=${Uri.encodeComponent(_passwordController.text)}'
+      // 2. CATAT LOG KE SUPABASE
+      await DeviceService.logActivity(
+        deviceId: widget.deviceId,
+        type: 'wifi_configured',
+        title: 'Konfigurasi Wi-Fi Dikirim',
+        description: 'Jaringan baru (${_ssidController.text}) telah dikirim ke perangkat via Bluetooth.',
       );
+
+      // 3. Simpan ke riwayat lokal SharedPreferences
+      await _saveWifiToHistory(_ssidController.text, _passwordController.text);
+
+      if (mounted) {
+        setState(() => _isConnecting = false);
+        // Lanjut ke halaman loading/connecting berikutnya
+        context.push(
+          '/device/${widget.deviceId}/wifi-connecting?ssid=${Uri.encodeComponent(_ssidController.text)}&password=${Uri.encodeComponent(_passwordController.text)}'
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isConnecting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal mengirim konfigurasi Wi-Fi: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+ Future<void> _handleDisconnectInternet() async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Putuskan Koneksi Internet?'),
+        content: const Text(
+          'Perangkat akan memutuskan sambungan ke Wi-Fi saat ini, lalu mengaktifkan mode Hotspot lokal (Tagana-AP) dan Bluetooth secara mandiri untuk akses darurat.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Ya, Putuskan', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final bleService = BleTelemetryService.instance;
+      
+      if (!bleService.isConnected) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Bluetooth belum terhubung. Harap hubungkan BLE terlebih dahulu.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // 1. Kirim string perintah DISCONNECT_WIFI via BLE ke ESP32
+      await bleService.sendRawCommand('DISCONNECT_WIFI');
+
+      // 2. CATAT LOG KE SUPABASE
+      await DeviceService.logActivity(
+        deviceId: widget.deviceId,
+        type: 'network_reset',
+        title: 'Internet Diputus (Mode Darurat)',
+        description: 'Koneksi Wi-Fi diputus. Perangkat beralih ke Mode Hotspot.',
+      );
+
+      if (mounted) {
+        setState(() {
+          _deviceData = null; // Reset data sementara agar kartu membaca ulang state offline
+          _isLoadingDevice = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Internet diputus. Perangkat beralih ke Mode Darurat (Offline).'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal mengirim perintah: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -134,14 +253,14 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
               children: [
                 _buildDeviceContext(),
                 const SizedBox(height: 24.0),
-                _buildSectionLabel('STATUS WI-FI SAAT INI'),
+                _buildSectionLabel('STATUS KONEKSI INTERNET (CLOUD)'),
                 const SizedBox(height: 8.0),
-                _buildWifiStatusCard(),
+                _buildInternetStatusCard(),
                 const SizedBox(height: 24.0),
-                _buildSectionLabel('KONFIGURASI JARINGAN'),
+                _buildSectionLabel('KONTROL TAKTIS & JARINGAN'),
                 const SizedBox(height: 12.0),
                 _buildConfigurationForm(),
-                const SizedBox(height: 120.0), // Padding untuk banner bawah
+                const SizedBox(height: 120.0),
               ],
             ),
           ),
@@ -178,7 +297,7 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
             ),
           ),
           Text(
-            'Hubungkan perangkat TAGANA ke internet',
+            'Kelola koneksi internet perangkat TAGANA',
             style: TextStyle(
               fontFamily: 'Plus Jakarta Sans',
               fontSize: 12,
@@ -231,31 +350,15 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
                     color: _HtmlColors.onSurfaceVariant,
                   ),
                 ),
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        widget.deviceId,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontFamily: 'Plus Jakarta Sans',
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: _HtmlColors.onSurface,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 4.0),
-                    Text(
-                      '(${BleTelemetryService.instance.connectedDeviceCode ?? 'Unknown'})',
-                      style: const TextStyle(
-                        fontFamily: 'Plus Jakarta Sans',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                        color: _HtmlColors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
+                Text(
+                  widget.deviceId,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: 'Plus Jakarta Sans',
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: _HtmlColors.onSurface,
+                  ),
                 ),
               ],
             ),
@@ -278,7 +381,26 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
     );
   }
 
-  Widget _buildWifiStatusCard() {
+  Widget _buildInternetStatusCard() {
+    if (_isLoadingDevice) {
+      return Container(
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: _HtmlColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(8.0),
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    final isOnline = _deviceData?.device.isConnected ?? false;
+
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
@@ -300,29 +422,34 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
               Container(
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
-                  color: _HtmlColors.surfaceVariant,
+                  color: isOnline ? Colors.green.shade50 : Colors.orange.shade50,
                   borderRadius: BorderRadius.circular(8.0),
                 ),
-                child: const Icon(Icons.wifi_off, color: _HtmlColors.onSurfaceVariant),
+                child: Icon(
+                  isOnline ? Icons.wifi : Icons.wifi_off,
+                  color: isOnline ? Colors.green.shade700 : Colors.orange.shade700,
+                ),
               ),
               const SizedBox(width: 16.0),
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Belum Terhubung',
-                    style: TextStyle(
-                      fontFamily: 'Plus Jakarta Sans',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: _HtmlColors.onSurface,
-                    ),
-                  ),
-                  Text(
-                    'Perangkat sedang offline',
+                    isOnline ? 'Terhubung ke Internet (Online)' : 'Perangkat Offline',
                     style: TextStyle(
                       fontFamily: 'Plus Jakarta Sans',
                       fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isOnline ? Colors.green.shade800 : Colors.orange.shade800,
+                    ),
+                  ),
+                  Text(
+                    isOnline 
+                        ? 'Data telemetri berjalan normal via Cloud' 
+                        : 'Belum ada sinyal internet dari perangkat',
+                    style: const TextStyle(
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontSize: 11,
                       fontWeight: FontWeight.w400,
                       color: _HtmlColors.onSurfaceVariant,
                     ),
@@ -331,7 +458,10 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
               ),
             ],
           ),
-          const Icon(Icons.info_outline, color: _HtmlColors.outlineVariant),
+          Icon(
+            isOnline ? Icons.check_circle : Icons.info_outline,
+            color: isOnline ? Colors.green.shade500 : Colors.orange.shade400,
+          ),
         ],
       ),
     );
@@ -355,7 +485,7 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Masukkan detail jaringan Wi-Fi dari provider Anda.',
+            'Masukkan detail jaringan Wi-Fi baru untuk perangkat Anda.',
             style: TextStyle(
               fontFamily: 'Plus Jakarta Sans',
               fontSize: 14,
@@ -469,13 +599,35 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
                     ),
                   )
                 : const Text(
-                    'Hubungkan Perangkat',
+                    'Kirim Konfigurasi ke Perangkat',
                     style: TextStyle(
                       fontFamily: 'Plus Jakarta Sans',
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+          ),
+          const SizedBox(height: 12.0),
+          // Tombol Putuskan Internet / Masuk Mode Darurat
+          OutlinedButton.icon(
+            onPressed: _handleDisconnectInternet,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.red.shade700,
+              side: BorderSide(color: Colors.red.shade300),
+              padding: const EdgeInsets.symmetric(vertical: 14.0),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10.0),
+              ),
+            ),
+            icon: const Icon(Icons.wifi_off, size: 18),
+            label: const Text(
+              'Putuskan Internet (Mode Darurat)',
+              style: TextStyle(
+                fontFamily: 'Plus Jakarta Sans',
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -507,10 +659,10 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
             const SizedBox(width: 8.0),
             const Expanded(
               child: Text(
-                'Wi-Fi adalah koneksi utama. Jika tidak tersedia saat darurat, perangkat akan otomatis menggunakan BLE atau Hotspot untuk mengirimkan data.',
+                'Wi-Fi adalah jalur komunikasi utama. Saat mengirim konfigurasi jaringan baru atau memutuskan koneksi, pastikan perangkat berada dalam jangkauan Bluetooth.',
                 style: TextStyle(
                   fontFamily: 'Plus Jakarta Sans',
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.w400,
                   color: _HtmlColors.secondary,
                 ),

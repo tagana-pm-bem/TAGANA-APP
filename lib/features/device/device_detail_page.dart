@@ -40,7 +40,6 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
   bool _isLoading = true;
   String? _errorMessage;
   RealtimeChannel? _channel;
-  bool _isBleConnecting = false;
   bool _isBleConnected = false;
   StreamSubscription? _bleTelemetrySub;
   Timer? _pollingTimer;
@@ -54,12 +53,11 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
       onChange: _load,
     );
 
-
     _isBleConnected = BleTelemetryService.instance.isConnectedNotifier.value;
     BleTelemetryService.instance.isConnectedNotifier.addListener(_onBleConnectionChanged);
     _bleTelemetrySub = BleTelemetryService.instance.telemetryStream.listen(_onBleDataReceived);
 
-    // ponytail: auto-refresh tiap 2 detik jika supabase realtime blm narik UI otomatis
+    // Auto-refresh tiap 2 detik jika supabase realtime blm narik UI otomatis
     _pollingTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (mounted && !_isBleConnected) _load();
     });
@@ -69,9 +67,6 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
     if (mounted) {
       setState(() {
         _isBleConnected = BleTelemetryService.instance.isConnectedNotifier.value;
-        if (!_isBleConnected) {
-          _isBleConnecting = false; // Reset loading state if disconnected
-        }
       });
     }
   }
@@ -88,75 +83,25 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
     super.dispose();
   }
 
-  Future<void> _connectToBle() async {
-    if (_isBleConnecting || _isBleConnected) return;
-
-    setState(() {
-      _isBleConnecting = true;
-      _errorMessage = null;
-    });
-
-    try {
-      // Prioritaskan deviceCode dari data Supabase, jika offline/null ambil dari parameter route
-      final deviceCode = _data?.device.deviceCode ?? widget.initialDeviceCode;
-      
-      if (deviceCode == null) {
-        throw Exception("Kode alat (TGN_XXXX) belum tersedia. Harap sinkronisasi internet sekali saja.");
-      }
-      
-      await BleTelemetryService.instance.connect(deviceCode);
-
-      if (mounted) {
-        setState(() {
-          _isBleConnecting = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Berhasil terhubung ke Bluetooth Telemetri!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isBleConnecting = false;
-          _errorMessage = e.toString().replaceFirst('Exception: ', '');
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Koneksi BLE Gagal: $_errorMessage'),
-            backgroundColor: AppColors.destructive,
-          ),
-        );
-      }
-    }
-  }
-
   void _onBleDataReceived(Map<String, dynamic> bleData) {
     if (!mounted || _data == null) return;
     
     setState(() {
-      // Data dari BLE (JSON format di ESP32 html_ui/ble_setup)
-      // "battery": "100% (2183)", "water": 450, "lat": null, "lng": null, "gps_valid": false, "buzzer_manual": false
-      
       final String batStr = bleData['battery']?.toString() ?? '0%';
       final batPercentStr = batStr.split('%').first;
       final int batPercent = int.tryParse(batPercentStr) ?? 0;
       
       final waterRaw = double.tryParse(bleData['water']?.toString() ?? '0') ?? 0;
-      // Konversi RAW (1900 max) ke CM (maks 4.0 cm) seperti di ESP32
       double waterCm = (waterRaw / 1900.0) * 4.0;
       if (waterCm > 4.0) waterCm = 4.0;
       if (waterCm < 0.0) waterCm = 0.0;
       
-      final bool isFlood = waterRaw > 50; // Threshold baru dari ESP32 config.h
+      final bool isFlood = waterRaw > 50;
 
       final bool gpsValid = bleData['gps_valid'] == true || bleData['gps_valid'] == 'true';
       final double? lat = gpsValid ? double.tryParse(bleData['lat']?.toString() ?? '') : null;
       final double? lng = gpsValid ? double.tryParse(bleData['lng']?.toString() ?? '') : null;
       
-
       final currentDevice = _data!.device;
       
       _data = DeviceDetailData(
@@ -170,7 +115,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
           status: 'Bluetooth Connected',
           waterLevel: waterCm,
           batteryLevel: batPercent,
-          signalStrength: -40, // Asumsi BLE kuat jika terkoneksi
+          signalStrength: -40,
           isFloodDetected: isFlood,
           lastSeenAt: DateTime.now(),
         ),
@@ -934,34 +879,28 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
       children: [
         if (!isConnected) ..._buildOfflineBanner(context, textTheme),
         
-        // [PONYTAIL FIX]: Tombol Bluetooth SELALU DIMUNCULKAN di luar banner offline.
-        // Karena meskipun status Supabase masih nyangkut di "Online", pengguna harus tetap bisa 
-        // membajak koneksinya lewat Bluetooth kapan saja mereka mau (Mode Taktis Instan).
+        // Tombol Bluetooth diarahkan langsung ke halaman pemindaian BleConnectPage
         if (!_isBleConnected)
           ElevatedButton.icon(
-            onPressed: _isBleConnecting ? null : _connectToBle,
+            onPressed: () => context.push('/device/${widget.deviceId}/ble'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: AppColors.primaryForeground,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            icon: _isBleConnecting
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                : const Icon(LucideIcons.bluetooth, size: 18),
-            label: Text(
-              _isBleConnecting ? 'Mencari Perangkat...' : 'Hubungkan Bluetooth (Mode Taktis)',
-              style: const TextStyle(fontWeight: FontWeight.bold)
+            icon: const Icon(LucideIcons.bluetooth, size: 18),
+            label: const Text(
+              'Hubungkan Bluetooth (Mode Taktis)',
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
         if (!_isBleConnected) const SizedBox(height: AppSpacing.sm),
 
-        // [PONYTAIL FIX]: Selalu tampilkan tombol setting Wi-Fi.
-        // Konfigurasi Wi-Fi dikirim via Bluetooth, jadi tombol ini harus selalu ada.
         ElevatedButton.icon(
           onPressed: () => context.push('/device/${widget.deviceId}/wifi-config'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.secondary, // Ganti warna agar tidak terlalu merah/destruktif
+            backgroundColor: AppColors.secondary,
             foregroundColor: AppColors.secondaryForeground,
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -974,8 +913,6 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
         _buildEmergencyBtn(context),
         const SizedBox(height: AppSpacing.sm),
         _buildTestConnectionBtn(context),
-        const SizedBox(height: AppSpacing.sm),
-        _buildCalibrateBtn(),
       ],
     );
   }
@@ -1043,21 +980,6 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
       ),
       icon: const Icon(LucideIcons.radio, size: 18),
       label: const Text('Uji Koneksi', style: TextStyle(fontWeight: FontWeight.bold)),
-    );
-  }
-
-  Widget _buildCalibrateBtn() {
-    return ElevatedButton.icon(
-      onPressed: () {},
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.indigo.shade50,
-        foregroundColor: Colors.indigo.shade900,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      icon: const Icon(LucideIcons.sliders, size: 18),
-      label: const Text('Kalibrasi', style: TextStyle(fontWeight: FontWeight.bold)),
     );
   }
 }
