@@ -882,7 +882,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
         // Tombol Bluetooth diarahkan langsung ke halaman pemindaian BleConnectPage
         if (!_isBleConnected)
           ElevatedButton.icon(
-            onPressed: () => context.push('/device/${widget.deviceId}/ble'),
+            onPressed: () => context.push('/device/${widget.deviceId}/ble?returnTo=detail'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: AppColors.primaryForeground,

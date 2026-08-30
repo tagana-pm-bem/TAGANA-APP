@@ -134,7 +134,7 @@ class _BleConnectPageState extends State<BleConnectPage> {
             backgroundColor: Colors.green,
           ),
         );
-        if (widget.returnTo == 'emergency') {
+        if (widget.returnTo == 'emergency' || widget.returnTo == 'detail') {
           context.pop();
         } else {
           context.pushReplacement('/device/${widget.deviceId}/wifi-config');
