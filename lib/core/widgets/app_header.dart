@@ -35,12 +35,10 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                       'https://lh3.googleusercontent.com/aida-public/AB6AXuAhbGHh_GiUxKOnhs8Shlqj_Ml-e7D9w54Ee7CAtkMSfvl4Nu2Dhs7q0y8qaTwGGYmeGti8pFQZh5gUV2eFjQR0mQveRZwblPnlwO0M51EegFdEKY-O2UblCcvbVJrPqyWnQAbWUWECAhHCOq0pPZKUIdPmCaFnlXu7YtNIGY7oM3OC7xCWY60SS8jrJ-OrQbrg4PpgpB47wkOIv6cUTLlgRs-6LJfKwHhoU7bceejCNFVG-wmvIzao'),
                 ),
                 const SizedBox(width: AppSpacing.sm),
-                Text(
-                  'TAGANA',
-                  style: textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
+                Image.asset(
+                  'assets/images/tagana.jpg',
+                  height: 24,
+                  fit: BoxFit.contain,
                 ),
               ],
             ),
