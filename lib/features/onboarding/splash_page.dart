@@ -36,7 +36,7 @@ class _SplashPageState extends State<SplashPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Image.asset(
-              'assets/images/logo.png',
+              'assets/icons/logo.jpg',
               width: 160,
               height: 160,
               errorBuilder: (context, error, stackTrace) =>
@@ -47,8 +47,8 @@ class _SplashPageState extends State<SplashPage> {
               'TAGANA',
               style: TextStyle(
                 color: AppColors.primaryForeground,
-                fontSize: 25,
-                fontWeight: FontWeight.w900,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],

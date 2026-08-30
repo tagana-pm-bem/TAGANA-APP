@@ -13,12 +13,11 @@ class EnterDevicePage extends StatefulWidget {
 
 class _VerifyingDevicePageState extends State<EnterDevicePage> {
   final _codeController = TextEditingController();
-  static final RegExp _codePattern = RegExp(r'^TGN_\d{4}$');
 
   _DeviceCodeStatus get _status {
-    final code = _codeController.text.trim().toUpperCase();
+    final code = _codeController.text.trim();
     if (code.isEmpty) return _DeviceCodeStatus.empty;
-    return _codePattern.hasMatch(code)
+    return RegExp(r'^\d{4}$').hasMatch(code)
         ? _DeviceCodeStatus.valid
         : _DeviceCodeStatus.invalid;
   }
@@ -33,7 +32,7 @@ class _VerifyingDevicePageState extends State<EnterDevicePage> {
 
   void _onConnect() {
     if (!_canSubmit) return;
-    final deviceCode = _codeController.text.trim().toUpperCase();
+    final deviceCode = 'TGN_${_codeController.text.trim()}';
     // Navigasi ke halaman verifikasi perangkat dengan kode yang dimasukkan.
     // Proses pairing ke Supabase dilakukan di verifying_device.dart.
     context.go('/verifying-device/$deviceCode');
@@ -199,10 +198,20 @@ class _VerifyingDevicePageState extends State<EnterDevicePage> {
             children: [
               Icon(Icons.tag, size: 18, color: AppColors.mutedForeground),
               const SizedBox(width: 12),
+              Text(
+                'TGN_',
+                style: TextStyle(
+                  color: AppColors.foreground,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.5,
+                ),
+              ),
               Expanded(
                 child: TextField(
                   controller: _codeController,
-                  textCapitalization: TextCapitalization.characters,
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
                   onChanged: (_) => setState(() {}),
                   style: TextStyle(
                     color: AppColors.foreground,
@@ -211,7 +220,8 @@ class _VerifyingDevicePageState extends State<EnterDevicePage> {
                     letterSpacing: 1.5,
                   ),
                   decoration: InputDecoration(
-                    hintText: 'TGN_0001',
+                    counterText: '',
+                    hintText: '0001',
                     hintStyle: TextStyle(color: AppColors.mutedForeground),
                     filled: false,
                     border: InputBorder.none,
@@ -299,7 +309,7 @@ class _VerifyingDevicePageState extends State<EnterDevicePage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Contoh: TGN_0001, TGN_0025, TGN_0142',
+                  'Cukup ketikkan 4 digit angka dari kode perangkat Anda (Contoh: 0001, 0025, 0142).',
                   style: TextStyle(
                     color: AppColors.mutedForeground,
                     fontSize: 11,

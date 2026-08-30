@@ -204,7 +204,9 @@ final appRouter = GoRouter(
       path: '/device/:id/ble',
       builder: (context, state) {
         final deviceId = state.pathParameters['id']!;
-        return BleConnectPage(deviceId: deviceId);
+        final deviceCode = state.uri.queryParameters['code'];
+        final returnTo = state.uri.queryParameters['returnTo'];
+        return BleConnectPage(deviceId: deviceId, deviceCode: deviceCode, returnTo: returnTo);
       },
     ),
     GoRoute(

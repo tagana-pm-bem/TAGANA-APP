@@ -123,11 +123,14 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _buildGreeting(TextTheme textTheme) {
     final name = UserRepository.currentUser?.name ?? '';
+    final hour = DateTime.now().hour;
+    final greeting = hour < 11 ? 'Selamat pagi' : hour < 15 ? 'Selamat siang' : hour < 18 ? 'Selamat sore' : 'Selamat malam';
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          name.isNotEmpty ? 'Selamat pagi, $name' : 'Selamat pagi',
+          name.isNotEmpty ? '$greeting, $name' : greeting,
           style: textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.bold,
             color: AppColors.primary,
