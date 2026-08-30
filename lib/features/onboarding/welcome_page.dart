@@ -37,7 +37,7 @@ class _WelcomePageState extends State<WelcomePage> {
         children: [
           // Background hero image
           Image.asset(
-            'assets/images/flood_monitor_hero.jpg',
+            'assets/images/tagana.jpg',
             fit: BoxFit.cover,
             errorBuilder: (context, error, stackTrace) =>
                 Container(color: AppColors.primary),

@@ -180,7 +180,7 @@ class DeviceService {
     );
   }
 
-  /// Ambil semua perangkat milik user yang login beserta status terbarunya.
+  /// Ambil semua perangkat milik user yang login beserta status terbarunya.  
   /// RLS otomatis membatasi ke device milik auth.uid(), sama seperti di
   /// DashboardService.
   static Future<List<DeviceWithStatus>> fetchDevices() async {
@@ -371,6 +371,18 @@ class DeviceService {
       print('[LOG] Aktivitas "$title" berhasil dicatat.');
     } catch (e) {
       print('[LOG] Gagal mencatat aktivitas: $e');
+    }
+  }
+
+  static Future<void> forceDeviceOffline(String deviceId) async {
+    try {
+      final client = SupabaseClientService.client;
+      await client.from('device_status').update({
+        'status': 'offline',
+      }).eq('device_id', deviceId);
+      print('[DeviceService] Status perangkat diset offline.');
+    } catch (e) {
+      print('[DeviceService] Gagal set offline: $e');
     }
   }
 }

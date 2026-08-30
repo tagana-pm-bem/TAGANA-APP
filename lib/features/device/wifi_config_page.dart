@@ -205,7 +205,10 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
       // 1. Kirim string perintah DISCONNECT_WIFI via BLE ke ESP32
       await bleService.sendRawCommand('DISCONNECT_WIFI');
 
-      // 2. CATAT LOG KE SUPABASE
+      // 2. Paksa status device offline di Supabase agar realtime merespons seketika
+      await DeviceService.forceDeviceOffline(widget.deviceId);
+
+      // 3. CATAT LOG KE SUPABASE
       await DeviceService.logActivity(
         deviceId: widget.deviceId,
         type: 'network_reset',
@@ -308,6 +311,42 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
         ],
       ),
       centerTitle: true,
+      actions: [
+        ValueListenableBuilder<bool>(
+          valueListenable: BleTelemetryService.instance.isConnectedNotifier,
+          builder: (context, isConnected, child) {
+            return Center(
+              child: Container(
+                margin: const EdgeInsets.only(right: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isConnected ? Colors.blue.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.bluetooth,
+                      size: 14,
+                      color: isConnected ? Colors.blue : Colors.red,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isConnected ? 'BLE' : 'Off',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: isConnected ? Colors.blue : Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 

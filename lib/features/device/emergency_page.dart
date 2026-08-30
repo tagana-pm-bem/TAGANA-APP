@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/services/ble_telemetry_service.dart';
+import '../../core/services/device_service.dart';
+import 'models/device_detail_data.dart';
 
 class EmergencyPage extends StatefulWidget {
   const EmergencyPage({
@@ -20,6 +23,38 @@ class EmergencyPage extends StatefulWidget {
 
 class _EmergencyPageState extends State<EmergencyPage> {
   bool _isBuzzerOn = false;
+  DeviceDetailData? _deviceData;
+  RealtimeChannel? _channel;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDeviceData();
+    _channel = DeviceService.subscribeToDeviceDetail(
+      deviceId: widget.deviceId,
+      onChange: _loadDeviceData,
+    );
+  }
+
+  Future<void> _loadDeviceData() async {
+    try {
+      final data = await DeviceService.fetchDeviceDetail(widget.deviceId);
+      if (mounted) {
+        setState(() {
+          _deviceData = data;
+        });
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    final channel = _channel;
+    if (channel != null) {
+      DeviceService.unsubscribeDeviceStatus(channel);
+    }
+    super.dispose();
+  }
 
   void _toggleBuzzer() {
     if (!BleTelemetryService.instance.isConnected) {
@@ -58,10 +93,15 @@ class _EmergencyPageState extends State<EmergencyPage> {
         builder: (context, snapshot) {
           final data = snapshot.data;
           final waterRaw = double.tryParse(data?['water']?.toString() ?? '0') ?? 0;
-          // Threshold banjir dari konfigurasi ESP32 (nilai > 50 / 1000 tergantung kalibrasi)
           final isFlood = waterRaw > 50; 
-          final wifiSSID = data?['ssid']?.toString();
-          final isWifiAvailable = wifiSSID != null && wifiSSID.isNotEmpty && wifiSSID != 'Unknown';
+          
+          bool isInternetConnected;
+          if (BleTelemetryService.instance.isConnected && data != null) {
+            final wifiSSID = data['ssid']?.toString();
+            isInternetConnected = wifiSSID != null && wifiSSID.isNotEmpty && wifiSSID != 'Unknown';
+          } else {
+            isInternetConnected = _deviceData?.device.isConnected ?? false;
+          }
 
           return Stack(
             children: [
@@ -77,13 +117,13 @@ class _EmergencyPageState extends State<EmergencyPage> {
                   children: [
                     _buildEmergencyStatusCard(textTheme, isFlood, data),
                     const SizedBox(height: AppSpacing.lg),
-                    _buildPenyebabSection(textTheme, isFlood, isWifiAvailable),
+                    _buildPenyebabSection(textTheme, isFlood, isInternetConnected),
                     const SizedBox(height: AppSpacing.lg),
                     _buildKomunikasiDaruratSection(context, textTheme),
                     const SizedBox(height: AppSpacing.lg),
                     _buildStatusDataBLESection(textTheme),
                     const SizedBox(height: AppSpacing.lg),
-                    _buildDataEmergencySummary(textTheme, isFlood, wifiSSID, data),
+                    _buildDataEmergencySummary(textTheme, isFlood, isInternetConnected, data),
                   ],
                 ),
               ),
@@ -247,7 +287,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
     );
   }
 
-  Widget _buildPenyebabSection(TextTheme textTheme, bool isFlood, bool isWifiAvailable) {
+  Widget _buildPenyebabSection(TextTheme textTheme, bool isFlood, bool isInternetConnected) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -293,14 +333,14 @@ class _EmergencyPageState extends State<EmergencyPage> {
                           children: [
                             Expanded(child: _buildCauseItem(textTheme, 'Water Sensor', isFlood ? 'Air terdeteksi' : 'Normal', LucideIcons.droplet, isFlood)),
                             const SizedBox(width: AppSpacing.md),
-                            Expanded(child: _buildCauseItem(textTheme, 'Koneksi Wi-Fi', isWifiAvailable ? 'Terhubung' : 'Tidak tersedia', LucideIcons.wifi, !isWifiAvailable)),
+                            Expanded(child: _buildCauseItem(textTheme, 'Koneksi Wi-Fi', isInternetConnected ? 'Terhubung' : 'Tidak tersedia', LucideIcons.wifi, !isInternetConnected)),
                           ],
                         )
                       : Column(
                           children: [
                             _buildCauseItem(textTheme, 'Water Sensor', isFlood ? 'Air terdeteksi' : 'Normal', LucideIcons.droplet, isFlood),
                             const SizedBox(height: AppSpacing.md),
-                            _buildCauseItem(textTheme, 'Koneksi Wi-Fi', isWifiAvailable ? 'Terhubung' : 'Tidak tersedia', LucideIcons.wifi, !isWifiAvailable),
+                            _buildCauseItem(textTheme, 'Koneksi Wi-Fi', isInternetConnected ? 'Terhubung' : 'Tidak tersedia', LucideIcons.wifi, !isInternetConnected),
                           ],
                         );
                 },
@@ -383,99 +423,109 @@ class _EmergencyPageState extends State<EmergencyPage> {
   }
 
   Widget _buildBLECard(BuildContext context, TextTheme textTheme) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+    return ValueListenableBuilder<bool>(
+      valueListenable: BleTelemetryService.instance.isConnectedNotifier,
+      builder: (context, isBleConnected, child) {
+        return Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Bluetooth Low Energy',
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.foreground,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isBleConnected ? AppColors.success.withOpacity(0.1) : AppColors.destructive.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: isBleConnected ? AppColors.success : AppColors.destructive,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          isBleConnected ? 'Aktif' : 'Terputus',
+                          style: textTheme.labelSmall?.copyWith(
+                            color: isBleConnected ? AppColors.success : AppColors.destructive
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
               Text(
-                'Bluetooth Low Energy',
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.foreground,
-                ),
+                'Perangkat mengirimkan data real-time langsung ke aplikasi melalui Bluetooth.',
+                style: textTheme.bodyMedium?.copyWith(color: AppColors.mutedForeground),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.success,
-                        shape: BoxShape.circle,
+              const SizedBox(height: AppSpacing.lg),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: isBleConnected ? null : () => context.push('/device/${widget.deviceId}/ble?returnTo=emergency'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isBleConnected ? AppColors.muted : Colors.indigo,
+                        foregroundColor: isBleConnected ? AppColors.mutedForeground : Colors.white,
+                        disabledBackgroundColor: AppColors.muted,
+                        disabledForegroundColor: AppColors.mutedForeground,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
+                      icon: const Icon(LucideIcons.bluetooth, size: 18),
+                      label: const Text('Hubungkan BLE'),
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Aktif',
-                      style: textTheme.labelSmall?.copyWith(color: AppColors.success),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _toggleBuzzer,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _isBuzzerOn ? AppColors.destructive : AppColors.card,
+                        foregroundColor: _isBuzzerOn ? AppColors.destructiveForeground : AppColors.destructive,
+                        side: BorderSide(color: isBleConnected ? AppColors.destructive : AppColors.border),
+                        disabledForegroundColor: AppColors.mutedForeground,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: Icon(_isBuzzerOn ? LucideIcons.volumeX : LucideIcons.volume2, size: 18),
+                      label: Text(_isBuzzerOn ? 'Matikan Buzzer' : 'Bunyikan Buzzer'),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Perangkat mengirimkan data real-time langsung ke aplikasi melalui Bluetooth.',
-            style: textTheme.bodyMedium?.copyWith(color: AppColors.mutedForeground),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => context.push('/device/${widget.deviceId}/ble'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.indigo,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  icon: const Icon(LucideIcons.bluetooth, size: 18),
-                  label: const Text('Hubungkan BLE'),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _toggleBuzzer,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isBuzzerOn ? AppColors.destructive : AppColors.card,
-                    foregroundColor: _isBuzzerOn ? AppColors.destructiveForeground : AppColors.destructive,
-                    side: const BorderSide(color: AppColors.destructive),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  icon: Icon(_isBuzzerOn ? LucideIcons.volumeX : LucideIcons.volume2, size: 18),
-                  label: Text(_isBuzzerOn ? 'Matikan Buzzer' : 'Bunyikan Buzzer'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -696,7 +746,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
     );
   }
 
-  Widget _buildDataEmergencySummary(TextTheme textTheme, bool isFlood, String? wifiSSID, Map<String, dynamic>? data) {
+  Widget _buildDataEmergencySummary(TextTheme textTheme, bool isFlood, bool isInternetConnected, Map<String, dynamic>? data) {
     final timeStr = data != null ? "${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}:${DateTime.now().second.toString().padLeft(2, '0')}" : "--:--:--";
 
     return Column(
@@ -728,9 +778,9 @@ class _EmergencyPageState extends State<EmergencyPage> {
             children: [
               _buildSummaryRow(textTheme, 'Status Water Sensor', data == null ? 'Menunggu...' : (isFlood ? 'Air Terdeteksi' : 'Normal'), isFlood),
               const Divider(height: 1),
-              _buildSummaryRow(textTheme, 'Status Perangkat', data == null ? 'Offline' : (isFlood ? 'Emergency' : 'Aman'), isFlood, isStripe: true),
+              _buildSummaryRow(textTheme, 'Status Perangkat', _deviceData == null ? 'Offline' : (isFlood ? 'Emergency' : 'Aman'), isFlood, isStripe: true),
               const Divider(height: 1),
-              _buildSummaryRow(textTheme, 'Koneksi Wi-Fi', wifiSSID ?? 'Tidak terhubung', false),
+              _buildSummaryRow(textTheme, 'Koneksi Wi-Fi', isInternetConnected ? 'Terhubung' : 'Terputus', !isInternetConnected),
               const Divider(height: 1),
               _buildSummaryRow(textTheme, 'Data Terakhir', timeStr, false, isStripe: true),
             ],

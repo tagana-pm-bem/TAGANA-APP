@@ -424,7 +424,7 @@ class _DevicesPageState extends State<DevicesPage> {
     DeviceWithStatus device,
   ) {
     final isBleConnected = BleTelemetryService.instance.isConnected && 
-                           BleTelemetryService.instance.connectedDeviceCode == device.deviceCode;
+                           BleTelemetryService.instance.connectedDeviceId == device.id;
 
     final isConnected = isBleConnected || device.isConnected;
     final isWarning = _isWarning(device);
@@ -556,10 +556,16 @@ class _DevicesPageState extends State<DevicesPage> {
                   ),
                 ],
               ),
-              if (!isConnected) ...[
+              if (!device.isConnected) ...[
                 const SizedBox(height: AppSpacing.md),
                 ElevatedButton.icon(
-                  onPressed: () => context.push('/device/${device.deviceName}/wifi-config'),
+                  onPressed: () {
+                    if (isBleConnected) {
+                      context.push('/device/${device.id}/wifi-config');
+                    } else {
+                      context.push('/device/${device.id}/ble?code=${device.deviceCode}');
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.destructive,
                     foregroundColor: AppColors.destructiveForeground,
@@ -568,7 +574,10 @@ class _DevicesPageState extends State<DevicesPage> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   icon: const Icon(LucideIcons.wifi, size: 16),
-                  label: const Text('Hubungkan ke Internet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  label: Text(
+                    isBleConnected ? 'Konfigurasi Wi-Fi' : 'Hubungkan ke Internet', 
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)
+                  ),
                 ),
               ],
             ],

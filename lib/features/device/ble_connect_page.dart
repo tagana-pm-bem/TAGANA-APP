@@ -12,10 +12,14 @@ import '../../core/services/ble_telemetry_service.dart';
 class BleConnectPage extends StatefulWidget {
   const BleConnectPage({
     required this.deviceId,
+    this.deviceCode,
+    this.returnTo,
     super.key,
   });
 
   final String deviceId;
+  final String? deviceCode;
+  final String? returnTo;
 
   @override
   State<BleConnectPage> createState() => _BleConnectPageState();
@@ -117,7 +121,11 @@ class _BleConnectPageState extends State<BleConnectPage> {
       await FlutterBluePlus.stopScan();
 
       // Hubungkan menggunakan service BLE yang sudah ada di aplikasi
-      await BleTelemetryService.instance.connectToDevice(device);
+      await BleTelemetryService.instance.connectToDevice(
+        device,
+        deviceId: widget.deviceId,
+        deviceCode: widget.deviceCode,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -126,7 +134,11 @@ class _BleConnectPageState extends State<BleConnectPage> {
             backgroundColor: Colors.green,
           ),
         );
-        context.pop(); // Kembali ke halaman emergency setelah sukses
+        if (widget.returnTo == 'emergency') {
+          context.pop();
+        } else {
+          context.pushReplacement('/device/${widget.deviceId}/wifi-config');
+        }
       }
     } catch (e) {
       if (mounted) {

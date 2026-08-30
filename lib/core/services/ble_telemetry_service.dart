@@ -29,16 +29,18 @@ class BleTelemetryService {
 
   bool get isConnected => _device != null && isConnectedNotifier.value;
   String? get connectedDeviceCode => _connectedDeviceCode;
+  String? get connectedDeviceId => _connectedDeviceId;
   
   BluetoothDevice? connectedDevice;
 
-  Future<void> connectToDevice(BluetoothDevice device, {String? deviceId}) async {
+  Future<void> connectToDevice(BluetoothDevice device, {String? deviceId, String? deviceCode}) async {
     try {
       _device = device;
       // Lakukan koneksi BLE dengan timeout
       await _device!.connect(timeout: const Duration(seconds: 15));
       connectedDevice = device;
       _connectedDeviceId = deviceId; // Simpan UUID
+      _connectedDeviceCode = deviceCode; // Simpan Device Code
 
       // Update status koneksi
       isConnectedNotifier.value = true;
