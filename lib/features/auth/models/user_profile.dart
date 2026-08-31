@@ -3,6 +3,7 @@ class UserProfile {
   final String name;
   final String phone;
   final String? email;
+  final String? avatarUrl;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -11,6 +12,7 @@ class UserProfile {
     required this.name,
     required this.phone,
     this.email,
+    this.avatarUrl,
     this.createdAt,
     this.updatedAt,
   });
@@ -21,6 +23,7 @@ class UserProfile {
       name: json['name'] as String,
       phone: json['phone'] as String,
       email: json['email'] as String?,
+      avatarUrl: json['avatar_url'] as String?,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : null,
@@ -36,6 +39,7 @@ class UserProfile {
       'name': name,
       'phone': phone,
       'email': email,
+      'avatar_url': avatarUrl,
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
     };

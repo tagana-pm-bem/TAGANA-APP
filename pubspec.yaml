@@ -51,6 +51,7 @@ dependencies:
   latlong2: ^0.9.1
   webview_flutter: ^4.10.0
   wifi_iot: ^0.3.19+1
+  image_picker: ^1.2.1
 
 dev_dependencies:
   flutter_test:

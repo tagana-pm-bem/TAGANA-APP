@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/supabase/supabase_client.dart';
@@ -92,7 +93,7 @@ class UserRepository {
     try {
       final result = await _client
           .from('user_profiles')
-          .select('id, name, phone, email, created_at, updated_at')
+          .select('id, name, phone, email, avatar_url, created_at, updated_at')
           .eq('id', session.user.id)
           .maybeSingle();
 
@@ -113,5 +114,49 @@ class UserRepository {
   static Future<void> logout() async {
     await _client.auth.signOut();
     currentUser = null;
+  }
+
+  static Future<String?> uploadAvatar(String filePath, String fileName) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw Exception('Not authenticated');
+
+    final file = await _client.storage.from('avatars').upload(
+          '$userId/$fileName',
+          File(filePath),
+          fileOptions: const FileOptions(upsert: true),
+        );
+    
+    // get public url
+    return _client.storage.from('avatars').getPublicUrl('$userId/$fileName');
+  }
+  
+  static Future<UserProfile> updateProfile({
+    String? name,
+    String? phone,
+    String? email,
+    String? avatarUrl,
+  }) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw Exception('Not authenticated');
+
+    final updates = <String, dynamic>{
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    if (name != null) updates['name'] = name;
+    if (phone != null) updates['phone'] = phone;
+    if (email != null) updates['email'] = email;
+    if (avatarUrl != null) updates['avatar_url'] = avatarUrl;
+
+    final response = await _client
+        .from('user_profiles')
+        .update(updates)
+        .eq('id', userId)
+        .select()
+        .single();
+
+    final userProfile = UserProfile.fromJson(response);
+    currentUser = userProfile;
+    return userProfile;
   }
 }

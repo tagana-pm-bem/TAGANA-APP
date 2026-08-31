@@ -124,7 +124,8 @@ class _SettingsPageState extends State<SettingsPage> {
             _buildProfileCard(textTheme),
             const SizedBox(height: AppSpacing.lg),
 
-            // Akun Section
+            // Akun Section (dikomentari karena redundant, fungsi dipindah ke card foto profil)
+            /*
             _buildSettingsSection(
               textTheme,
               title: 'Akun',
@@ -152,6 +153,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
             ),
             const SizedBox(height: AppSpacing.md),
+            */
 
             // Notifikasi Section
             _buildSettingsSection(
@@ -190,12 +192,14 @@ class _SettingsPageState extends State<SettingsPage> {
               textTheme,
               title: 'Bantuan & Tentang',
               items: [
+                /*
                 _buildSettingsItem(
                   textTheme,
                   icon: LucideIcons.helpCircle,
                   title: 'Pusat Bantuan',
                   onTap: () => context.push('/settings/help'),
                 ),
+                */
                 _buildSettingsItem(
                   textTheme,
                   icon: LucideIcons.info,
@@ -252,13 +256,18 @@ class _SettingsPageState extends State<SettingsPage> {
                 CircleAvatar(
                   radius: 32,
                   backgroundColor: AppColors.primaryContainer,
-                  child: Text(
-                    initials,
-                    style: textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
-                  ),
+                  backgroundImage: user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty 
+                      ? NetworkImage(user.avatarUrl!) 
+                      : null,
+                  child: user?.avatarUrl == null || user!.avatarUrl!.isEmpty
+                      ? Text(
+                          initials,
+                          style: textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
