@@ -6,6 +6,7 @@ import '../../core/services/history_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/app_header.dart';
+import '../../core/widgets/skeleton_loader.dart';
 import 'models/history_event.dart';
 
 const _kMonths = [
@@ -200,7 +201,7 @@ class _HistoryPageState extends State<HistoryPage> {
             // Timeline
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? _buildSkeleton()
                   : RefreshIndicator(
                       onRefresh: _load,
                       child: grouped.isEmpty
@@ -237,6 +238,35 @@ class _HistoryPageState extends State<HistoryPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      children: [
+        const SizedBox(height: AppSpacing.sm),
+        const Skeleton(width: 100, height: 16),
+        const SizedBox(height: AppSpacing.sm),
+        ...List.generate(
+          3,
+          (index) => const Padding(
+            padding: EdgeInsets.only(bottom: AppSpacing.md),
+            child: Skeleton(height: 90),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        const Skeleton(width: 120, height: 16),
+        const SizedBox(height: AppSpacing.sm),
+        ...List.generate(
+          2,
+          (index) => const Padding(
+            padding: EdgeInsets.only(bottom: AppSpacing.md),
+            child: Skeleton(height: 90),
+          ),
+        ),
+      ],
     );
   }
 

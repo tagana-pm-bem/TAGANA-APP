@@ -35,11 +35,18 @@ class MapDeviceModel {
       deviceCode: json['device_code'] as String,
       deviceName: json['device_name'] as String,
       status: status,
-      latitude: (locationJson?['latitude'] as num?)?.toDouble() ?? 0.0,
-      longitude: (locationJson?['longitude'] as num?)?.toDouble() ?? 0.0,
+      latitude: _parseNum(locationJson?['latitude'])?.toDouble() ?? 0.0,
+      longitude: _parseNum(locationJson?['longitude'])?.toDouble() ?? 0.0,
       recordedAt: locationJson?['recorded_at'] != null 
           ? DateTime.parse(locationJson!['recorded_at'])
           : DateTime.now(),
     );
+  }
+
+  static num? _parseNum(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value;
+    if (value is String) return num.tryParse(value);
+    return null;
   }
 }

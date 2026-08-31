@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../auth/data/user_repository.dart';
+import '../../core/widgets/app_version_footer.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -30,29 +31,23 @@ class _SplashPageState extends State<SplashPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.primary,
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
+      backgroundColor: Colors.white,
+      body: Stack(
+        children: [
+          Center(
+            child: Image.asset(
               'assets/icons/logo.jpg',
-              width: 160,
-              height: 160,
+              width: 200,
+              height: 200,
               errorBuilder: (context, error, stackTrace) =>
                   const FlutterLogo(size: 120),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'TAGANA',
-              style: TextStyle(
-                color: AppColors.primaryForeground,
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
+          ),
+          const Align(
+            alignment: Alignment.bottomCenter,
+            child: AppVersionFooter(),
+          ),
+        ],
       ),
     );
   }

@@ -3,9 +3,11 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:tagana_app/core/theme/app_colors.dart';
+import '../../core/widgets/app_version_footer.dart';
 
 enum ConnectionStep { adapterOff, searching, found, connecting, connected, failed }
 
@@ -215,7 +217,19 @@ class _BluetoothConnectionPageState extends State<BluetoothConnectionPage>
             final name = r.advertisementData.advName.isNotEmpty
                 ? r.advertisementData.advName
                 : r.device.platformName;
-            return name.startsWith(widget.deviceNamePrefix);
+                
+            final upperName = name.toUpperCase();
+            final expectedUpper = widget.deviceNamePrefix.toUpperCase();
+            
+            // If expected is "TAGANA 0004", extract the "0004" part
+            final parts = expectedUpper.split(' ');
+            final suffix = parts.length > 1 ? parts.last : '';
+            
+            if (suffix.isNotEmpty) {
+              return upperName.startsWith('TAGANA') && upperName.contains(suffix);
+            }
+            
+            return upperName.startsWith(expectedUpper);
           })
           .map(BluetoothDeviceInfo.fromScanResult)
           .toList();
@@ -312,7 +326,11 @@ class _BluetoothConnectionPageState extends State<BluetoothConnectionPage>
   void _cancel() {
     FlutterBluePlus.stopScan();
     _selectedDevice?.device.disconnect();
-    Navigator.of(context).maybePop();
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/enter-device');
+    }
   }
 
   void _retry() {
@@ -332,7 +350,13 @@ class _BluetoothConnectionPageState extends State<BluetoothConnectionPage>
       body: SafeArea(
         child: Column(
           children: [
-            _Header(onBack: () => Navigator.of(context).maybePop()),
+            _Header(onBack: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/enter-device');
+              }
+            }),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
@@ -408,6 +432,7 @@ class _BluetoothConnectionPageState extends State<BluetoothConnectionPage>
               onDone: () => Navigator.of(context).maybePop(true),
               onRetry: _retry,
             ),
+            const AppVersionFooter(),
           ],
         ),
       ),
@@ -417,17 +442,17 @@ class _BluetoothConnectionPageState extends State<BluetoothConnectionPage>
   String _titleForStep(ConnectionStep step) {
     switch (step) {
       case ConnectionStep.adapterOff:
-        return 'Bluetooth Tidak Aktif';
+        return 'Akses Bluetooth Diperlukan';
       case ConnectionStep.searching:
-        return 'Mencari Perangkat Bluetooth';
+        return 'Memindai Sensor TAGANA...';
       case ConnectionStep.found:
-        return 'Perangkat Ditemukan';
+        return 'Sensor Terdeteksi';
       case ConnectionStep.connecting:
-        return 'Menghubungkan Bluetooth';
+        return 'Menyinkronkan Perangkat...';
       case ConnectionStep.connected:
-        return 'Bluetooth Terhubung';
+        return 'Sinkronisasi Berhasil';
       case ConnectionStep.failed:
-        return 'Gagal Terhubung';
+        return 'Koneksi Terputus';
     }
   }
 }

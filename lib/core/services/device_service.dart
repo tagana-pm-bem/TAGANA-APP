@@ -91,6 +91,45 @@ class DeviceService {
     }
   }
 
+  /// Hanya memverifikasi ketersediaan kode perangkat (tanpa melakukan pairing).
+  static Future<DeviceVerificationResult> verifyDeviceOnly(
+    String deviceCode,
+  ) async {
+    print('[DeviceService] Memulai verifikasi perangkat (tanpa pairing) untuk kode: $deviceCode');
+    final user = UserRepository.currentUser;
+    if (user == null) {
+      return const DeviceVerificationResult.failure('Sesi tidak ditemukan.');
+    }
+    try {
+      final result = await SupabaseClientService.client
+          .from('devices')
+          .select('id, device_code, device_name, firmware_version, user_id')
+          .ilike('device_code', deviceCode)
+          .maybeSingle();
+
+      if (result == null) {
+        return const DeviceVerificationResult.failure('Kode perangkat tidak terdaftar.');
+      }
+
+      final ownerId = result['user_id'] as String?;
+      if (ownerId != null && ownerId != user.id) {
+        return const DeviceVerificationResult.failure('Perangkat ini sudah terpasang pada akun lain.');
+      }
+
+      return DeviceVerificationResult.success(
+        DeviceInfo(
+          name: (result['device_name'] as String?) ?? deviceCode,
+          code: (result['device_code'] as String?) ?? deviceCode,
+          type: 'ESP32-TAGANA',
+          firmware: (result['firmware_version'] as String?) ?? '-',
+          region: '-',
+        ),
+      );
+    } catch (_) {
+      return const DeviceVerificationResult.failure('Gagal memverifikasi perangkat.');
+    }
+  }
+
   /// Cek apakah device yang sudah "terpasang" memang milik user yang sama.
   /// Jika iya, ini adalah reconnect yang valid — anggap sukses.
   /// Jika milik user lain, kembalikan failure.

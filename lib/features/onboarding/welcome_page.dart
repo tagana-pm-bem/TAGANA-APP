@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:tagana_app/core/theme/app_colors.dart';
+import 'package:tagana_app/core/widgets/app_version_footer.dart';
 
 class WelcomePage extends StatefulWidget {
   const WelcomePage({super.key});
@@ -18,10 +19,7 @@ class _WelcomePageState extends State<WelcomePage> {
         children: [
           _buildHeroSection(),
           Expanded(
-            child: Transform.translate(
-              offset: const Offset(0, -24),
-              child: _buildContentSheet(),
-            ),
+            child: _buildContentSheet(),
           ),
         ],
       ),
@@ -32,65 +30,14 @@ class _WelcomePageState extends State<WelcomePage> {
     return SizedBox(
       height: 320,
       width: double.infinity,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Background hero image
-          Image.asset(
-            'assets/images/tagana.jpg',
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) =>
-                Container(color: AppColors.primary),
-          ),
-          // Gradient overlay (navy, sesuai desain)
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppColors.primary.withOpacity(0.5),
-                  AppColors.primary.withOpacity(0.85),
-                ],
-              ),
-            ),
-          ),
-          // Logo mark + judul
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryForeground,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(Icons.waves, size: 40, color: AppColors.primary),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'TAGANA',
-                  style: TextStyle(
-                    color: AppColors.primaryForeground,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 2.4,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Flood Monitor',
-                  style: TextStyle(
-                    color: AppColors.primaryForeground.withOpacity(0.7),
-                    fontSize: 13,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+      child: Center(
+        child: Image.asset(
+          'assets/icons/logo.jpg',
+          width: 160,
+          height: 160,
+          errorBuilder: (context, error, stackTrace) =>
+              const FlutterLogo(size: 120),
+        ),
       ),
     );
   }
@@ -99,28 +46,16 @@ class _WelcomePageState extends State<WelcomePage> {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
-        color: AppColors.background,
+        color: Color.fromARGB(255, 255, 255, 255),
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(16),
           topRight: Radius.circular(16),
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Drag handle
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                color: AppColors.muted,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-          ),
           const SizedBox(height: 16),
           Text(
             'TAGANA Flood Monitor',
@@ -184,12 +119,15 @@ class _WelcomePageState extends State<WelcomePage> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            'Diperlukan perangkat TAGANA untuk memulai',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: AppColors.mutedForeground, fontSize: 11),
+          SizedBox(
+            width: double.infinity,
+            child: Text(
+              'Diperlukan perangkat TAGANA untuk memulai',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.mutedForeground, fontSize: 11),
+            ),
           ),
+          const AppVersionFooter(),
         ],
       ),
     );

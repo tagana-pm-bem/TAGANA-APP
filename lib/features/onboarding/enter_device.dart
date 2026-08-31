@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tagana_app/core/theme/app_colors.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/widgets/app_version_footer.dart';
 
 enum _DeviceCodeStatus { empty, valid, invalid }
 
@@ -66,6 +67,7 @@ class _VerifyingDevicePageState extends State<EnterDevicePage> {
                 ),
               ),
             ),
+            const AppVersionFooter(),
           ],
         ),
       ),
@@ -85,7 +87,13 @@ class _VerifyingDevicePageState extends State<EnterDevicePage> {
             height: 36,
             child: IconButton(
               padding: EdgeInsets.zero,
-              onPressed: () => Navigator.of(context).maybePop(),
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/dashboard');
+                }
+              },
               icon: Icon(
                 Icons.arrow_back,
                 size: 20,

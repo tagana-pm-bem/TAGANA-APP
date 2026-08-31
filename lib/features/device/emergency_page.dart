@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -25,6 +26,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
   bool _isBuzzerOn = false;
   DeviceDetailData? _deviceData;
   RealtimeChannel? _channel;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
@@ -34,6 +36,10 @@ class _EmergencyPageState extends State<EmergencyPage> {
       deviceId: widget.deviceId,
       onChange: _loadDeviceData,
     );
+    // Timer untuk cek timeout internet (1 menit)
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _loadDeviceData() async {
@@ -49,6 +55,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     final channel = _channel;
     if (channel != null) {
       DeviceService.unsubscribeDeviceStatus(channel);
@@ -95,12 +102,25 @@ class _EmergencyPageState extends State<EmergencyPage> {
           final waterRaw = double.tryParse(data?['water']?.toString() ?? '0') ?? 0;
           final isFlood = waterRaw > 50; 
           
-          bool isInternetConnected;
-          if (BleTelemetryService.instance.isConnected && data != null) {
+          final device = _deviceData?.device;
+          bool isInternetConnected = false;
+
+          bool isForceOffline = false;
+          if (device != null) {
+            if (device.status == 'offline') {
+              isForceOffline = true;
+            } else if (device.lastSeenAt != null && DateTime.now().toUtc().difference(device.lastSeenAt!.toUtc()).inMinutes >= 1) {
+              isForceOffline = true;
+            }
+          }
+
+          if (isForceOffline) {
+            isInternetConnected = false;
+          } else if (BleTelemetryService.instance.isConnected && data != null) {
             final wifiSSID = data['ssid']?.toString();
             isInternetConnected = wifiSSID != null && wifiSSID.isNotEmpty && wifiSSID != 'Unknown';
           } else {
-            isInternetConnected = _deviceData?.device.isConnected ?? false;
+            isInternetConnected = device?.isConnected ?? false;
           }
 
           return Stack(
@@ -491,7 +511,10 @@ class _EmergencyPageState extends State<EmergencyPage> {
                 children: [
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: isBleConnected ? null : () => context.push('/device/${widget.deviceId}/ble?returnTo=emergency'),
+                      onPressed: isBleConnected ? null : () {
+                        final deviceName = _deviceData?.device.deviceName ?? '';
+                        context.push('/device/${widget.deviceId}/ble?returnTo=emergency&name=${Uri.encodeComponent(deviceName)}');
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: isBleConnected ? AppColors.muted : Colors.indigo,
                         foregroundColor: isBleConnected ? AppColors.mutedForeground : Colors.white,
