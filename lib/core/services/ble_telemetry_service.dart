@@ -105,14 +105,21 @@ class BleTelemetryService {
       print('[BLE] Mengaktifkan Notifikasi Realtime...');
       await _txCharacteristic!.setNotifyValue(true);
 
+      String _buffer = '';
       _notifySubscription = _txCharacteristic!.onValueReceived.listen((value) {
         if (value.isNotEmpty) {
           try {
-            final jsonStr = utf8.decode(value);
-            final data = jsonDecode(jsonStr) as Map<String, dynamic>;
-            _telemetryController.add(data);
+            _buffer += utf8.decode(value, allowMalformed: true);
+            // Mencoba mendeteksi apakah JSON sudah lengkap (kurung tutup terakhir)
+            // Ini adalah pendekatan sederhana, lebih baik menggunakan regex atau nested bracket counter
+            if (_buffer.trim().endsWith('}')) {
+              final data = jsonDecode(_buffer) as Map<String, dynamic>;
+              _telemetryController.add(data);
+              _buffer = ''; // Reset buffer setelah berhasil decode
+            }
           } catch (e) {
-            print('[BLE] Error decoding JSON: $e');
+            // Abaikan error sebagian, buffer akan menampung chunk selanjutnya
+            if (_buffer.length > 2048) _buffer = ''; // Mencegah memory leak jika JSON rusak parah
           }
         }
       });
@@ -262,14 +269,18 @@ class BleTelemetryService {
         );
       }
 
+      String _buffer2 = '';
       _notifySubscription = _txCharacteristic!.onValueReceived.listen((value) {
         if (value.isNotEmpty) {
           try {
-            final jsonStr = utf8.decode(value);
-            final data = jsonDecode(jsonStr) as Map<String, dynamic>;
-            _telemetryController.add(data);
+            _buffer2 += utf8.decode(value, allowMalformed: true);
+            if (_buffer2.trim().endsWith('}')) {
+              final data = jsonDecode(_buffer2) as Map<String, dynamic>;
+              _telemetryController.add(data);
+              _buffer2 = '';
+            }
           } catch (e) {
-            print('[BLE] Error decoding JSON: $e');
+            if (_buffer2.length > 2048) _buffer2 = '';
           }
         }
       });

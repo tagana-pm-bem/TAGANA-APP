@@ -53,14 +53,29 @@ class DeviceWithStatus {
       isActive: json['is_active'] as bool? ?? false,
       registeredAt: DateTime.parse(json['registered_at'] as String),
       status: statusJson?['status'] as String?,
-      waterLevel: statusJson?['water_level'] as num?,
-      batteryLevel: statusJson?['battery_level'] as num?,
-      signalStrength: statusJson?['signal_strength'] as int?,
+      waterLevel: _parseNum(statusJson?['water_level']),
+      batteryLevel: _parseNum(statusJson?['battery_level']),
+      signalStrength: _parseInt(statusJson?['signal_strength']),
       isFloodDetected: statusJson?['is_flood_detected'] as bool? ?? false,
       lastSeenAt: statusJson?['last_seen_at'] != null
           ? DateTime.parse(statusJson!['last_seen_at'] as String)
           : null,
     );
+  }
+
+  static num? _parseNum(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value;
+    if (value is String) return num.tryParse(value);
+    return null;
+  }
+
+  static int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 }
 
@@ -100,8 +115,8 @@ class AlertSummary {
       type: json['type'] as String,
       severity: json['severity'] as String,
       status: json['status'] as String,
-      value: json['value'] as num?,
-      threshold: json['threshold'] as num?,
+      value: DeviceWithStatus._parseNum(json['value']),
+      threshold: DeviceWithStatus._parseNum(json['threshold']),
       message: json['message'] as String,
       triggeredAt: DateTime.parse(json['triggered_at'] as String),
       deviceCode: deviceJson?['device_code'] as String?,

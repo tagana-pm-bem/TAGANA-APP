@@ -315,32 +315,55 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
         ValueListenableBuilder<bool>(
           valueListenable: BleTelemetryService.instance.isConnectedNotifier,
           builder: (context, isConnected, child) {
+            final deviceCode = BleTelemetryService.instance.connectedDeviceCode ?? 'BLE';
             return Center(
-              child: Container(
-                margin: const EdgeInsets.only(right: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isConnected ? Colors.blue.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.bluetooth,
-                      size: 14,
-                      color: isConnected ? Colors.blue : Colors.red,
+              child: GestureDetector(
+                onTap: isConnected ? () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Putuskan BLE'),
+                      content: Text('Apakah Anda yakin ingin memutuskan koneksi Bluetooth dari $deviceCode?'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                          onPressed: () => Navigator.pop(context, true), 
+                          child: const Text('Putuskan', style: TextStyle(color: Colors.white)),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      isConnected ? 'BLE' : 'Off',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                  );
+                  if (confirm == true) {
+                    await BleTelemetryService.instance.disconnect();
+                  }
+                } : null,
+                child: Container(
+                  margin: const EdgeInsets.only(right: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isConnected ? Colors.blue.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isConnected ? Icons.bluetooth : Icons.bluetooth_disabled,
+                        size: 14,
                         color: isConnected ? Colors.blue : Colors.red,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      Text(
+                        isConnected ? deviceCode : 'Off',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: isConnected ? Colors.blue : Colors.red,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -649,7 +672,9 @@ class _WifiConfigPageState extends State<WifiConfigPage> {
           const SizedBox(height: 12.0),
           // Tombol Putuskan Internet / Masuk Mode Darurat
           OutlinedButton.icon(
-            onPressed: _handleDisconnectInternet,
+            onPressed: (_isLoadingDevice || _deviceData == null || !_deviceData!.device.isConnected) 
+                ? null 
+                : _handleDisconnectInternet,
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.red.shade700,
               side: BorderSide(color: Colors.red.shade300),

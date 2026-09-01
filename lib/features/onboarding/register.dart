@@ -3,6 +3,7 @@ import 'package:tagana_app/core/theme/app_colors.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:tagana_app/features/auth/data/user_repository.dart';
+import '../../core/widgets/app_version_footer.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -95,6 +96,7 @@ class _RegisterWhatsAppPageState extends State<RegisterPage> {
                 ),
               ),
             ),
+            const AppVersionFooter(),
           ],
         ),
       ),

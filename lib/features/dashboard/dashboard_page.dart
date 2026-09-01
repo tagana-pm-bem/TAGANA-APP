@@ -7,8 +7,10 @@ import '../../core/services/dashboard_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/app_header.dart';
+import '../../core/widgets/skeleton_loader.dart';
 import '../auth/data/user_repository.dart';
 import 'models/dashboard_models.dart';
+import '../../core/services/ble_telemetry_service.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -28,10 +30,16 @@ class _DashboardPageState extends State<DashboardPage> {
     super.initState();
     _load();
     _channel = DashboardService.subscribeToDeviceStatus(onChange: _load);
+    BleTelemetryService.instance.isConnectedNotifier.addListener(_onBleStatusChanged);
+  }
+
+  void _onBleStatusChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    BleTelemetryService.instance.isConnectedNotifier.removeListener(_onBleStatusChanged);
     final channel = _channel;
     if (channel != null) {
       DashboardService.unsubscribe(channel);
@@ -67,7 +75,7 @@ class _DashboardPageState extends State<DashboardPage> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? _buildSkeleton(textTheme)
             : SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(
@@ -121,6 +129,59 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  Widget _buildSkeleton(TextTheme textTheme) {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.md,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Greeting skeleton
+          const Skeleton(width: 150, height: 24),
+          const SizedBox(height: 8),
+          const Skeleton(width: 200, height: 16),
+          const SizedBox(height: AppSpacing.lg),
+          
+          // Stats grid skeleton
+          GridView.count(
+            crossAxisCount: 2,
+            crossAxisSpacing: AppSpacing.sm,
+            mainAxisSpacing: AppSpacing.sm,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            childAspectRatio: 1.3,
+            children: List.generate(4, (index) => const Skeleton(height: 100)),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          
+          // Quick actions skeleton
+          Row(
+            children: List.generate(
+              3,
+              (index) => const Expanded(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4.0),
+                  child: Skeleton(height: 80),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          
+          // List skeleton
+          const Skeleton(width: 150, height: 20),
+          const SizedBox(height: AppSpacing.sm),
+          const Skeleton(height: 80),
+          const SizedBox(height: AppSpacing.sm),
+          const Skeleton(height: 80),
+        ],
+      ),
+    );
+  }
+
   Widget _buildGreeting(TextTheme textTheme) {
     final name = UserRepository.currentUser?.name ?? '';
     final hour = DateTime.now().hour;
@@ -162,6 +223,9 @@ class _DashboardPageState extends State<DashboardPage> {
           label: 'AKTIF',
           value: '${data.totalDevices}',
           subtitle: 'Perangkat Aktif',
+          backgroundColor: AppColors.primaryContainer.withOpacity(0.5),
+          iconColor: AppColors.primary,
+          valueColor: AppColors.primary,
         ),
         _buildStatCard(
           textTheme,
@@ -169,6 +233,9 @@ class _DashboardPageState extends State<DashboardPage> {
           label: 'STABIL',
           value: '${data.connectedDevices}',
           subtitle: 'Terhubung',
+          backgroundColor: Colors.green.shade50,
+          iconColor: AppColors.success,
+          valueColor: AppColors.success,
         ),
         _buildStatCard(
           textTheme,
@@ -176,14 +243,83 @@ class _DashboardPageState extends State<DashboardPage> {
           label: data.activeAlertsCount > 0 ? 'PERHATIAN' : 'AMAN',
           value: '${data.activeAlertsCount}',
           subtitle: 'Peringatan',
+          backgroundColor: data.activeAlertsCount > 0 
+              ? AppColors.destructive.withOpacity(0.1) 
+              : Colors.blue.shade50,
+          iconColor: data.activeAlertsCount > 0 
+              ? AppColors.destructive 
+              : Colors.blue.shade700,
+          valueColor: data.activeAlertsCount > 0 
+              ? AppColors.destructive 
+              : Colors.blue.shade700,
         ),
-        _buildStatCard(
-          textTheme,
-          icon: LucideIcons.activity,
-          label: 'SISTEM',
-          value: data.systemCondition,
-          subtitle: 'Kondisi',
-          valueSize: 20,
+        Builder(
+          builder: (context) {
+            return StreamBuilder<Map<String, dynamic>>(
+              stream: BleTelemetryService.instance.telemetryStream,
+              builder: (context, snapshot) {
+                
+                final deviceList = data.devices.isEmpty 
+                    ? [Text('Tidak ada sensor', style: textTheme.bodySmall?.copyWith(color: AppColors.mutedForeground))] 
+                    : data.devices.map((device) {
+                        int batLevel = device.batteryLevel?.round() ?? 0;
+                        
+                        // Timpa dengan data BLE realtime jika ini adalah perangkat yang terhubung BLE
+                        if (BleTelemetryService.instance.isConnected && 
+                            BleTelemetryService.instance.connectedDeviceCode == device.deviceCode &&
+                            snapshot.hasData && 
+                            snapshot.data!.containsKey('battery')) {
+                          final batVal = snapshot.data!['battery'];
+                          if (batVal is num) {
+                            batLevel = batVal.round();
+                          } else if (batVal is String) {
+                            batLevel = int.tryParse(batVal.split('%').first) ?? batLevel;
+                          }
+                        }
+                        
+                        Color batColor = batLevel > 80 ? AppColors.success : (batLevel > 30 ? AppColors.warning : AppColors.destructive);
+                        IconData batIcon = batLevel > 80 ? LucideIcons.batteryFull : (batLevel > 30 ? LucideIcons.batteryMedium : LucideIcons.batteryLow);
+                        
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  device.deviceCode, 
+                                  style: textTheme.labelSmall?.copyWith(fontSize: 10, color: AppColors.mutedForeground),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  Icon(batIcon, size: 10, color: batColor),
+                                  const SizedBox(width: 4),
+                                  Text('$batLevel%', style: textTheme.labelSmall?.copyWith(fontSize: 11, fontWeight: FontWeight.bold, color: batColor)),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList();
+
+                return _buildStatCard(
+                  textTheme,
+                  icon: LucideIcons.battery,
+                  label: 'BATERAI',
+                  backgroundColor: Colors.orange.shade50,
+                  iconColor: Colors.orange.shade800,
+                  customContent: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: deviceList,
+                    ),
+                  ),
+                );
+              },
+            );
+          }
         ),
       ],
     );
@@ -193,16 +329,22 @@ class _DashboardPageState extends State<DashboardPage> {
     TextTheme textTheme, {
     required IconData icon,
     required String label,
-    required String value,
-    required String subtitle,
+    String? value,
+    String? subtitle,
     double? valueSize,
+    Color? valueColor,
+    Color? backgroundColor,
+    Color? iconColor,
+    Widget? customContent,
   }) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: backgroundColor ?? AppColors.card,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(
+          color: backgroundColor != null ? backgroundColor.withOpacity(0.3) : AppColors.border,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.02),
@@ -218,37 +360,45 @@ class _DashboardPageState extends State<DashboardPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(icon, size: 20, color: AppColors.mutedForeground),
+              Icon(icon, size: 20, color: iconColor ?? AppColors.mutedForeground),
               Text(
                 label,
                 style: textTheme.labelSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.2,
-                  color: AppColors.mutedForeground,
+                  color: iconColor?.withOpacity(0.8) ?? AppColors.mutedForeground,
                 ),
               ),
             ],
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
-                  fontSize: valueSize,
-                ),
+          if (customContent != null)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 12.0),
+                child: customContent,
               ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: textTheme.bodySmall?.copyWith(
-                  color: AppColors.mutedForeground,
+            )
+          else
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value ?? '',
+                  style: textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: valueColor ?? AppColors.primary,
+                    fontSize: valueSize,
+                  ),
                 ),
-              ),
-            ],
-          ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle ?? '',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: AppColors.mutedForeground,
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );

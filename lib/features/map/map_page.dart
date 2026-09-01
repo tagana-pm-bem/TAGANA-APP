@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -22,6 +24,25 @@ class _MapPageState extends ConsumerState<MapPage> {
   MapDeviceModel? _selectedDevice;
   String _searchQuery = '';
   String _selectedFilter = 'Semua';
+  String? _savedDeviceCode;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedDevice();
+  }
+
+  Future<void> _loadSavedDevice() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _savedDeviceCode = prefs.getString('last_selected_map_device');
+    });
+  }
+
+  Future<void> _saveDeviceCode(String code) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('last_selected_map_device', code);
+  }
 
   void _onMarkerTapped(MapDeviceModel device) {
     setState(() {
@@ -73,6 +94,12 @@ class _MapPageState extends ConsumerState<MapPage> {
                   _buildSearchBar(textTheme),
                   const SizedBox(height: AppSpacing.sm),
                   _buildStatusFilters(textTheme),
+                  const SizedBox(height: AppSpacing.sm),
+                  mapDevicesAsync.when(
+                    data: (devices) => _buildDeviceShortcuts(devices, textTheme),
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                  ),
                 ],
               ),
             ),
@@ -119,15 +146,27 @@ class _MapPageState extends ConsumerState<MapPage> {
         }).toList();
 
         LatLng initialCenter = const LatLng(-6.200000, 106.816666); // Default Jakarta
+        double initialZoom = 10.0;
+        
         if (filteredDevices.isNotEmpty) {
            initialCenter = LatLng(filteredDevices.first.latitude, filteredDevices.first.longitude);
+           
+           if (_savedDeviceCode != null) {
+              try {
+                final savedDevice = filteredDevices.firstWhere((d) => d.deviceCode == _savedDeviceCode);
+                initialCenter = LatLng(savedDevice.latitude, savedDevice.longitude);
+                initialZoom = 16.0;
+              } catch (_) {
+                // If saved device not found in current filters, fallback to first
+              }
+           }
         }
 
         return FlutterMap(
           mapController: _mapController,
           options: MapOptions(
             initialCenter: initialCenter,
-            initialZoom: 10.0,
+            initialZoom: initialZoom,
             onTap: (_, __) => _closePreview(),
           ),
           children: [
@@ -136,63 +175,97 @@ class _MapPageState extends ConsumerState<MapPage> {
               userAgentPackageName: 'com.tagana.app',
             ),
             MarkerLayer(
-              markers: filteredDevices.map((device) {
-                final color = _getStatusColor(device.status);
-                final isSelected = _selectedDevice?.id == device.id;
-                
-                return Marker(
-                  point: LatLng(device.latitude, device.longitude),
-                  width: 120,
-                  height: 60,
-                  alignment: Alignment.topCenter,
-                  child: GestureDetector(
-                    onTap: () => _onMarkerTapped(device),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.card,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: isSelected ? AppColors.primary : AppColors.border,
-                              width: isSelected ? 2 : 1,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Text(
-                            device.deviceCode,
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                  color: AppColors.foreground,
+              markers: () {
+                final groupedDevices = <String, List<MapDeviceModel>>{};
+                for (final d in filteredDevices) {
+                  // Mengelompokkan perangkat yang memiliki titik persis sama
+                  final key = '${d.latitude.toStringAsFixed(5)}_${d.longitude.toStringAsFixed(5)}';
+                  groupedDevices.putIfAbsent(key, () => []).add(d);
+                }
+
+                final markers = <Marker>[];
+                for (final group in groupedDevices.values) {
+                  if (group.isEmpty) continue;
+                  
+                  // Posisi titik tetap diam/asli (tidak digeser)
+                  final lat = group.first.latitude;
+                  final lng = group.first.longitude;
+                  
+                  // Menentukan warna titik gabungan (prioritaskan yang kritis/warning)
+                  Color dotColor = AppColors.mutedForeground;
+                  if (group.any((d) => d.status == 'critical')) {
+                    dotColor = Colors.red.shade600;
+                  } else if (group.any((d) => d.status == 'warning')) {
+                    dotColor = Colors.yellow.shade600;
+                  } else if (group.any((d) => d.status == 'online')) {
+                    dotColor = Colors.green.shade500;
+                  }
+
+                  final bool anySelected = group.any((d) => _selectedDevice?.id == d.id);
+
+                  markers.add(
+                    Marker(
+                      point: LatLng(lat, lng),
+                      width: 140,
+                      height: 30.0 + (group.length * 35.0), 
+                      alignment: Alignment.topCenter,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Tumpuk semua label device di satu titik
+                          ...group.map((device) {
+                            final isSelected = _selectedDevice?.id == device.id;
+                            return GestureDetector(
+                              onTap: () => _onMarkerTapped(device),
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.card,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isSelected ? AppColors.primary : AppColors.border,
+                                    width: isSelected ? 2 : 1,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.05),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
                                 ),
+                                child: Text(
+                                  device.deviceCode,
+                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                        color: AppColors.foreground,
+                                      ),
+                                ),
+                              ),
+                            );
+                          }),
+                          
+                          // Satu titik (dot) merepresentasikan lokasi fisiknya
+                          Container(
+                            width: anySelected ? 20 : 16,
+                            height: anySelected ? 20 : 16,
+                            decoration: BoxDecoration(
+                              color: dotColor,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppColors.card, width: 2),
+                              boxShadow: [
+                                BoxShadow(color: dotColor.withOpacity(0.5), blurRadius: 4),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Container(
-                          width: isSelected ? 20 : 16,
-                          height: isSelected ? 20 : 16,
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.card, width: 2),
-                            boxShadow: [
-                              BoxShadow(color: color.withOpacity(0.5), blurRadius: 4),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
+                        ],
+                      ),
+                    )
+                  );
+                }
+                return markers;
+              }(),
             ),
           ],
         );
@@ -331,6 +404,64 @@ class _MapPageState extends ConsumerState<MapPage> {
             color: isActive ? AppColors.primaryForeground : AppColors.foreground,
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDeviceShortcuts(List<MapDeviceModel> devices, TextTheme textTheme) {
+    if (devices.isEmpty) return const SizedBox.shrink();
+    
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: devices.map((device) {
+          final isSelected = (_selectedDevice != null && _selectedDevice?.id == device.id) || 
+                             (_selectedDevice == null && _savedDeviceCode == device.deviceCode);
+          return Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.xs),
+            child: GestureDetector(
+              onTap: () {
+                _onMarkerTapped(device);
+                _saveDeviceCode(device.deviceCode);
+                setState(() => _savedDeviceCode = device.deviceCode);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primary : AppColors.card,
+                  borderRadius: BorderRadius.circular(20),
+                  border: isSelected ? null : Border.all(color: AppColors.border),
+                  boxShadow: [
+                    if (!isSelected)
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      LucideIcons.mapPin,
+                      size: 14,
+                      color: isSelected ? AppColors.primaryForeground : AppColors.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      device.deviceCode,
+                      style: textTheme.labelSmall?.copyWith(
+                        color: isSelected ? AppColors.primaryForeground : AppColors.foreground,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }

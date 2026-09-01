@@ -13,12 +13,14 @@ class BleConnectPage extends StatefulWidget {
   const BleConnectPage({
     required this.deviceId,
     this.deviceCode,
+    this.deviceName,
     this.returnTo,
     super.key,
   });
 
   final String deviceId;
   final String? deviceCode;
+  final String? deviceName;
   final String? returnTo;
 
   @override
@@ -114,11 +116,30 @@ class _BleConnectPageState extends State<BleConnectPage> {
   }
 
   Future<void> _connectToDevice(BluetoothDevice device) async {
+    // Verifikasi Perangkat agar tidak salah pilih sensor
+    if (widget.deviceCode != null && widget.deviceCode!.isNotEmpty) {
+      final name = device.platformName.isNotEmpty ? device.platformName : "Perangkat TAGANA";
+      final expectedSuffix = widget.deviceCode!.replaceAll('TGN_', '');
+      
+      if (!name.contains(expectedSuffix)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Salah perangkat! Anda harus menghubungkan ke ${widget.deviceName ?? widget.deviceCode}, tapi yang Anda pilih adalah $name.'),
+            backgroundColor: Colors.orange.shade800,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+    }
+
     setState(() => _connectingDeviceId = device.remoteId.toString());
 
     try {
       // Hentikan proses scan sebelum mulai koneksi
-      await FlutterBluePlus.stopScan();
+      if (FlutterBluePlus.isScanningNow) {
+        await FlutterBluePlus.stopScan();
+      }
 
       // Hubungkan menggunakan service BLE yang sudah ada di aplikasi
       await BleTelemetryService.instance.connectToDevice(
@@ -134,10 +155,13 @@ class _BleConnectPageState extends State<BleConnectPage> {
             backgroundColor: Colors.green,
           ),
         );
-        if (widget.returnTo == 'emergency' || widget.returnTo == 'detail') {
+        
+        if (widget.returnTo == 'wifi-config') {
+          context.pushReplacement('/device/${widget.deviceId}/wifi-config');
+        } else if (context.canPop()) {
           context.pop();
         } else {
-          context.pushReplacement('/device/${widget.deviceId}/wifi-config');
+          context.go('/devices');
         }
       }
     } catch (e) {
@@ -160,7 +184,9 @@ class _BleConnectPageState extends State<BleConnectPage> {
   void dispose() {
     _scanResultsSubscription.cancel();
     _adapterStateSubscription.cancel();
-    FlutterBluePlus.stopScan();
+    if (FlutterBluePlus.isScanningNow) {
+      FlutterBluePlus.stopScan();
+    }
     super.dispose();
   }
 
@@ -210,14 +236,14 @@ class _BleConnectPageState extends State<BleConnectPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Hubungkan BLE',
+            widget.deviceName ?? 'Hubungkan BLE',
             style: textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
               color: AppColors.foreground,
             ),
           ),
           Text(
-            'Target ID: ${widget.deviceId}',
+            widget.deviceCode ?? 'ID: ${widget.deviceId.substring(0, 8)}...',
             style: textTheme.labelSmall?.copyWith(
               color: AppColors.mutedForeground,
             ),
@@ -287,14 +313,14 @@ class _BleConnectPageState extends State<BleConnectPage> {
           const SizedBox(height: AppSpacing.lg),
           Text(
             _isScanning 
-                ? 'Mencari perangkat TAGANA di sekitar Anda...' 
+                ? 'Mencari ${widget.deviceName ?? "perangkat TAGANA"} di sekitar Anda...' 
                 : (_scanResults.isEmpty 
-                    ? 'Tidak ada perangkat TAGANA ditemukan. Pastikan alat menyala dalam mode darurat.' 
+                    ? 'Tidak ada perangkat ditemukan. Pastikan alat menyala dalam mode darurat.' 
                     : 'Ditemukan ${_scanResults.length} perangkat TAGANA.'),
+            textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(
               color: AppColors.mutedForeground,
             ),
-            textAlign: TextAlign.center,
           ),
           if (_isScanning) ...[
             const SizedBox(height: AppSpacing.md),

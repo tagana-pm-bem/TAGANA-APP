@@ -882,7 +882,10 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
         // Tombol Bluetooth diarahkan langsung ke halaman pemindaian BleConnectPage
         if (!_isBleConnected)
           ElevatedButton.icon(
-            onPressed: () => context.push('/device/${widget.deviceId}/ble?returnTo=detail'),
+            onPressed: () {
+              final deviceName = _data?.device.deviceName ?? '';
+              context.push('/device/${widget.deviceId}/ble?returnTo=wifi-config&code=${widget.initialDeviceCode ?? ""}&name=${Uri.encodeComponent(deviceName)}');
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: AppColors.primaryForeground,
@@ -898,7 +901,14 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
         if (!_isBleConnected) const SizedBox(height: AppSpacing.sm),
 
         ElevatedButton.icon(
-          onPressed: () => context.push('/device/${widget.deviceId}/wifi-config'),
+          onPressed: () {
+            if (!_isBleConnected && !isConnected) {
+              final deviceName = _data?.device.deviceName ?? '';
+              context.push('/device/${widget.deviceId}/ble?returnTo=wifi-config&code=${widget.initialDeviceCode ?? ""}&name=${Uri.encodeComponent(deviceName)}');
+            } else {
+              context.push('/device/${widget.deviceId}/wifi-config');
+            }
+          },
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.secondary,
             foregroundColor: AppColors.secondaryForeground,

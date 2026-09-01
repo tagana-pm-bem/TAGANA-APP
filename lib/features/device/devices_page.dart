@@ -7,6 +7,7 @@ import '../../core/services/device_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/app_header.dart';
+import '../../core/widgets/skeleton_loader.dart';
 import '../dashboard/models/dashboard_models.dart';
 import '../../core/services/ble_telemetry_service.dart';
 
@@ -41,7 +42,11 @@ class _DevicesPageState extends State<DevicesPage> {
   }
 
   void _onBleStatusChanged() {
-    if (mounted) setState(() {});
+    if (mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    }
   }
 
   @override
@@ -106,7 +111,7 @@ class _DevicesPageState extends State<DevicesPage> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? _buildSkeleton()
             : SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(
@@ -137,6 +142,59 @@ class _DevicesPageState extends State<DevicesPage> {
         foregroundColor: AppColors.primaryForeground,
         icon: const Icon(LucideIcons.plus),
         label: const Text('Hubungkan Perangkat', style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.md,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Stats row skeleton
+          Row(
+            children: List.generate(
+              4,
+              (index) => const Expanded(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4.0),
+                  child: Skeleton(height: 70),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          
+          // Search skeleton
+          const Skeleton(height: 48),
+          const SizedBox(height: AppSpacing.md),
+          
+          // Filter chips skeleton
+          Row(
+            children: List.generate(
+              3,
+              (index) => const Padding(
+                padding: EdgeInsets.only(right: 8.0),
+                child: Skeleton(width: 80, height: 32, borderRadius: 16),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          
+          // Devices list skeleton
+          ...List.generate(
+            4,
+            (index) => const Padding(
+              padding: EdgeInsets.only(bottom: AppSpacing.md),
+              child: Skeleton(height: 120),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -556,30 +614,102 @@ class _DevicesPageState extends State<DevicesPage> {
                   ),
                 ],
               ),
-              if (!device.isConnected) ...[
-                const SizedBox(height: AppSpacing.md),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    if (isBleConnected) {
-                      context.push('/device/${device.id}/wifi-config');
-                    } else {
-                      context.push('/device/${device.id}/ble?code=${device.deviceCode}');
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.destructive,
-                    foregroundColor: AppColors.destructiveForeground,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        if (isBleConnected) {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Putuskan BLE'),
+                              content: Text('Putuskan koneksi Bluetooth dari ${device.deviceCode}?'),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text('Putuskan', style: TextStyle(color: Colors.white)),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            await BleTelemetryService.instance.disconnect();
+                          }
+                        } else {
+                          if (BleTelemetryService.instance.isConnected) {
+                            final currentCode = BleTelemetryService.instance.connectedDeviceCode ?? 'perangkat lain';
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Ganti Koneksi BLE?'),
+                                content: Text('Anda sedang terhubung ke BLE $currentCode. Putuskan dan hubungkan ke ${device.deviceCode}?'),
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                                    onPressed: () => Navigator.pop(context, true),
+                                    child: const Text('Lanjutkan', style: TextStyle(color: Colors.white)),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirm != true) return;
+                            await BleTelemetryService.instance.disconnect();
+                          }
+                          if (context.mounted) {
+                            context.push('/device/${device.id}/ble?code=${device.deviceCode}&name=${Uri.encodeComponent(device.deviceName)}');
+                          }
+                        }
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: isBleConnected ? Colors.red : AppColors.primary,
+                        side: BorderSide(color: isBleConnected ? Colors.red.withOpacity(0.5) : AppColors.primary.withOpacity(0.5)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: Icon(isBleConnected ? LucideIcons.bluetoothOff : LucideIcons.bluetooth, size: 16),
+                      label: Text(
+                        isBleConnected ? 'Putuskan BLE' : 'Hubungkan BLE',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ),
-                  icon: const Icon(LucideIcons.wifi, size: 16),
-                  label: Text(
-                    isBleConnected ? 'Konfigurasi Wi-Fi' : 'Hubungkan ke Internet', 
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        if (isBleConnected) {
+                          context.push('/device/${device.id}/wifi-config');
+                        } else {
+                          if (device.isConnected) {
+                            context.push('/device/${device.id}/wifi-config');
+                          } else {
+                            context.push('/device/${device.id}/ble?returnTo=wifi-config&code=${device.deviceCode}&name=${Uri.encodeComponent(device.deviceName)}');
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: (isBleConnected || device.isConnected) ? AppColors.primary : AppColors.destructive,
+                        foregroundColor: (isBleConnected || device.isConnected) ? AppColors.primaryForeground : AppColors.destructiveForeground,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: Icon(LucideIcons.wifi, size: 16),
+                      label: Text(
+                        (isBleConnected || device.isConnected) ? 'Konfigurasi Wi-Fi' : 'Offline, Setup!',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ],
           ),
       ),

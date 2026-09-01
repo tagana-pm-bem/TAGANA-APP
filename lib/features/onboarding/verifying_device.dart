@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tagana_app/core/theme/app_colors.dart';
+import '../../core/widgets/app_version_footer.dart';
 
 class DeviceInfo {
   const DeviceInfo({
@@ -140,6 +141,7 @@ class _DeviceVerificationPageState extends State<DeviceVerificationPage> {
                 },
               ),
             ),
+            const AppVersionFooter(),
           ],
         ),
       ),

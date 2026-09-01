@@ -29,6 +29,7 @@ import '../../features/onboarding/verifying_device.dart';
 import '../../features/onboarding/bluetooth_connection.dart';
 import '../../features/onboarding/connection_success.dart';
 import '../services/device_service.dart';
+import '../widgets/animated_branch_container.dart';
 import 'app_shell.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -69,8 +70,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/bluetooth/:deviceCode',
       builder: (context, state) {
+        final deviceCode = state.pathParameters['deviceCode'] ?? '';
+        final expectedName = deviceCode.isNotEmpty ? deviceCode.replaceFirst('TGN_', 'TAGANA ') : 'TAGANA';
         return BluetoothConnectionPage(
-          deviceNamePrefix: 'TAGANA',
+          deviceNamePrefix: expectedName,
           onConnected: (info) =>
               context.go('/connection-success/${info.deviceId}', extra: info),
         );
@@ -97,28 +100,56 @@ final appRouter = GoRouter(
     ),
 
     // ShellRoute for main app navigation with bottom bar
-    ShellRoute(
-      navigatorKey: _shellNavigatorKey,
-      builder: (context, state, child) {
-        return AppShell(child: child);
+    StatefulShellRoute(
+      builder: (context, state, navigationShell) {
+        return AppShell(navigationShell: navigationShell);
       },
-      routes: [
-        GoRoute(
-          path: '/dashboard',
-          builder: (context, state) => const DashboardPage(),
+      navigatorContainerBuilder: (context, navigationShell, children) {
+        return AnimatedBranchContainer(
+          currentIndex: navigationShell.currentIndex,
+          children: children,
+        );
+      },
+      branches: [
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/dashboard',
+              builder: (context, state) => const DashboardPage(),
+            ),
+          ],
         ),
-        GoRoute(
-          path: '/devices',
-          builder: (context, state) => const DevicesPage(),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/devices',
+              builder: (context, state) => const DevicesPage(),
+            ),
+          ],
         ),
-        GoRoute(path: '/map', builder: (context, state) => const MapPage()),
-        GoRoute(
-          path: '/history',
-          builder: (context, state) => const HistoryPage(),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/map',
+              builder: (context, state) => const MapPage(),
+            ),
+          ],
         ),
-        GoRoute(
-          path: '/settings',
-          builder: (context, state) => const SettingsPage(),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/history',
+              builder: (context, state) => const HistoryPage(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/settings',
+              builder: (context, state) => const SettingsPage(),
+            ),
+          ],
         ),
       ],
     ),
@@ -205,8 +236,14 @@ final appRouter = GoRouter(
       builder: (context, state) {
         final deviceId = state.pathParameters['id']!;
         final deviceCode = state.uri.queryParameters['code'];
+        final deviceName = state.uri.queryParameters['name'];
         final returnTo = state.uri.queryParameters['returnTo'];
-        return BleConnectPage(deviceId: deviceId, deviceCode: deviceCode, returnTo: returnTo);
+        return BleConnectPage(
+          deviceId: deviceId, 
+          deviceCode: deviceCode, 
+          deviceName: deviceName,
+          returnTo: returnTo
+        );
       },
     ),
     GoRoute(

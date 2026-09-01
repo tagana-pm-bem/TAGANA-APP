@@ -6,6 +6,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:tagana_app/core/theme/app_colors.dart';
 import 'package:tagana_app/features/auth/data/user_repository.dart';
+import '../../core/widgets/app_version_footer.dart';
 
 enum StatusTone { success, warning, neutral }
 
@@ -295,6 +296,7 @@ class _ConnectionSuccessPageState extends State<ConnectionSuccessPage>
               ),
             ),
             _ContinueButton(onPressed: widget.onContinue),
+            const AppVersionFooter(),
           ],
         ),
       ),
