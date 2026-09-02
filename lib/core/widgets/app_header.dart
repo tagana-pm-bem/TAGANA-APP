@@ -32,7 +32,10 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
               children: [
                 Builder(
                   builder: (context) {
-                    final name = UserRepository.currentUser?.name ?? 'User';
+                    final user = UserRepository.currentUser;
+                    final name = user?.name ?? 'User';
+                    final avatarUrl = user?.avatarUrl;
+
                     final parts = name.trim().split(RegExp(r'\s+'));
                     String initials = 'U';
                     if (parts.isNotEmpty && parts[0].isNotEmpty) {
@@ -41,6 +44,27 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                       } else {
                         initials = parts[0][0].toUpperCase();
                       }
+                    }
+
+                    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+                      return Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                          image: DecorationImage(
+                            image: NetworkImage(avatarUrl),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      );
                     }
 
                     return Container(
@@ -140,12 +164,6 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
             },
           ),
         ),
-        IconButton(
-          icon: const Icon(LucideIcons.bell),
-          color: AppColors.primary,
-          onPressed: () {},
-        ),
-        const SizedBox(width: AppSpacing.sm),
       ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1.0),
