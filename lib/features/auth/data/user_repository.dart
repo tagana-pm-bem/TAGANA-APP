@@ -159,4 +159,19 @@ class UserRepository {
     currentUser = userProfile;
     return userProfile;
   }
+
+  static Future<void> updateFcmToken(String token) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+    
+    try {
+      // Perlu ditambah fcm_token di schema database (tabel user_profiles)
+      await _client
+          .from('user_profiles')
+          .update({'fcm_token': token})
+          .eq('id', userId);
+    } catch (e) {
+      print('Failed to save FCM token: $e');
+    }
+  }
 }

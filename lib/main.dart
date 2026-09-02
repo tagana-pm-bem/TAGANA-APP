@@ -5,6 +5,8 @@ import 'app.dart';
 import 'core/supabase/supabase_client.dart';
 import 'core/supabase/supabase_config.dart';
 import 'features/auth/data/user_repository.dart';
+import 'core/services/push_notification_service.dart';
+import 'core/navigation/app_router.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,6 +14,18 @@ Future<void> main() async {
   await SupabaseConfig.load();
   await SupabaseClientService.initialize();
   await UserRepository.restoreSessionProfile();
+
+  await PushNotificationService.instance.init();
+  PushNotificationService.instance.onNotificationClick = (payload) {
+    appRouter.go('/history');
+  };
+
+  if (UserRepository.currentUser != null) {
+    final token = await PushNotificationService.instance.getToken();
+    if (token != null) {
+      UserRepository.updateFcmToken(token);
+    }
+  }
 
   runApp(const ProviderScope(child: TaganaApp()));
 }

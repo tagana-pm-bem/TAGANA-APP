@@ -52,6 +52,9 @@ dependencies:
   webview_flutter: ^4.10.0
   wifi_iot: ^0.3.19+1
   image_picker: ^1.2.1
+  firebase_core: ^4.14.0
+  firebase_messaging: ^16.6.0
+  flutter_local_notifications: ^20.1.0
 
 dev_dependencies:
   flutter_test:
