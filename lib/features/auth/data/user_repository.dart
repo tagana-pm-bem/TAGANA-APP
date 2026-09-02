@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/supabase/supabase_client.dart';
 import '../models/user_profile.dart';
@@ -32,6 +34,7 @@ class UserRepository {
 
       final userProfile = UserProfile.fromJson(data['user']);
       currentUser = userProfile;
+      await _cacheProfile(userProfile);
       return userProfile;
     } catch (e) {
       throw Exception('Gagal mendaftar: $e');
@@ -58,6 +61,7 @@ class UserRepository {
 
       final userProfile = UserProfile.fromJson(data['user']);
       currentUser = userProfile;
+      await _cacheProfile(userProfile);
       return userProfile;
     } catch (e) {
       return null;
@@ -104,16 +108,40 @@ class UserRepository {
 
       final userProfile = UserProfile.fromJson(result);
       currentUser = userProfile;
+      await _cacheProfile(userProfile);
       return userProfile;
     } catch (_) {
-      currentUser = null;
-      return null;
+      // Jika offline, gagal mengambil dari server. Coba ambil dari local storage.
+      return await _loadCachedProfile();
     }
+  }
+
+  static Future<void> _cacheProfile(UserProfile profile) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cached_user_profile', jsonEncode(profile.toJson()));
+    } catch (_) {}
+  }
+
+  static Future<UserProfile?> _loadCachedProfile() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString('cached_user_profile');
+      if (str != null) {
+        final userProfile = UserProfile.fromJson(jsonDecode(str));
+        currentUser = userProfile;
+        return userProfile;
+      }
+    } catch (_) {}
+    currentUser = null;
+    return null;
   }
 
   static Future<void> logout() async {
     await _client.auth.signOut();
     currentUser = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('cached_user_profile');
   }
 
   static Future<String?> uploadAvatar(String filePath, String fileName) async {
@@ -157,6 +185,7 @@ class UserRepository {
 
     final userProfile = UserProfile.fromJson(response);
     currentUser = userProfile;
+    await _cacheProfile(userProfile);
     return userProfile;
   }
 

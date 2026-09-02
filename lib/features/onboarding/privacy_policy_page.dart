@@ -56,32 +56,24 @@ class _PrivacyPolicyPageState extends State<PrivacyPolicyPage> {
             const SizedBox(height: AppSpacing.lg),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                child: Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: AppColors.card,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Text(
-                    '1. Pengumpulan Data\n'
-                    'Aplikasi TAGANA mengumpulkan data telemetri sensor (ketinggian air, status baterai) '
-                    'serta lokasi perangkat untuk tujuan mitigasi bencana.\n\n'
-                    '2. Penggunaan Data\n'
-                    'Data yang dikumpulkan hanya digunakan untuk memantau status alat secara real-time '
-                    'dan memberikan notifikasi peringatan dini kepada pengguna terkait.\n\n'
-                    '3. Keamanan\n'
-                    'Kami menjaga keamanan data Anda dengan menggunakan infrastruktur server yang aman '
-                    '(Supabase). Data Anda tidak akan dibagikan kepada pihak ketiga tanpa izin.\n\n'
-                    '4. Persetujuan\n'
-                    'Dengan menggunakan aplikasi ini, Anda menyetujui pengumpulan dan penggunaan informasi '
-                    'seperti yang dijelaskan dalam kebijakan ini.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.foreground,
-                      height: 1.6,
-                    ),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+                child: Text(
+                  '1. Pengumpulan Data\n'
+                  'Aplikasi TAGANA mengumpulkan data telemetri sensor (ketinggian air, status baterai) '
+                  'serta lokasi perangkat untuk tujuan mitigasi bencana.\n\n'
+                  '2. Penggunaan Data\n'
+                  'Data yang dikumpulkan hanya digunakan untuk memantau status alat secara real-time '
+                  'dan memberikan notifikasi peringatan dini kepada pengguna terkait.\n\n'
+                  '3. Keamanan\n'
+                  'Kami menjaga keamanan data Anda dengan menggunakan infrastruktur server yang aman '
+                  '(Supabase). Data Anda tidak akan dibagikan kepada pihak ketiga tanpa izin.\n\n'
+                  '4. Persetujuan\n'
+                  'Dengan menggunakan aplikasi ini, Anda menyetujui pengumpulan dan penggunaan informasi '
+                  'seperti yang dijelaskan dalam kebijakan ini.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.foreground,
+                    height: 1.6,
                   ),
                 ),
               ),

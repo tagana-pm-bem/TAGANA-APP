@@ -77,7 +77,7 @@ class _DashboardPageState extends State<DashboardPage> {
         child: _isLoading
             ? _buildSkeleton(textTheme)
             : SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
+                physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.md,
                   vertical: AppSpacing.md,
@@ -131,7 +131,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _buildSkeleton(TextTheme textTheme) {
     return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
+      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.md,
@@ -308,7 +308,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   textTheme,
                   icon: LucideIcons.battery,
                   label: 'BATERAI',
-                  backgroundColor: Colors.orange.shade50,
+                    backgroundColor: Colors.orange.shade50,
                   iconColor: Colors.orange.shade800,
                   customContent: SingleChildScrollView(
                     child: Column(

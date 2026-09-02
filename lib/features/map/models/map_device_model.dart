@@ -43,6 +43,20 @@ class MapDeviceModel {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'device_code': deviceCode,
+      'device_name': deviceName,
+      'device_status': [{'status': status}],
+      'device_locations': [{
+        'latitude': latitude,
+        'longitude': longitude,
+        'recorded_at': recordedAt.toIso8601String(),
+      }],
+    };
+  }
+
   static num? _parseNum(dynamic value) {
     if (value == null) return null;
     if (value is num) return value;

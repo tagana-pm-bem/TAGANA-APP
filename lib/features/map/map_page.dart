@@ -11,6 +11,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import 'models/map_device_model.dart';
 import 'providers/map_provider.dart';
+import 'providers/cached_tile_provider.dart';
 
 class MapPage extends ConsumerStatefulWidget {
   const MapPage({super.key});
@@ -167,12 +168,15 @@ class _MapPageState extends ConsumerState<MapPage> {
           options: MapOptions(
             initialCenter: initialCenter,
             initialZoom: initialZoom,
+            maxZoom: 19.0, // Batas maksimal yang diizinkan OpenStreetMap
             onTap: (_, __) => _closePreview(),
           ),
           children: [
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.tagana.app',
+              tileProvider: CachedTileProvider(),
+              maxNativeZoom: 19, // Jangan ambil gambar di atas zoom 19
             ),
             MarkerLayer(
               markers: () {
