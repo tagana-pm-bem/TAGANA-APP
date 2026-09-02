@@ -21,6 +21,7 @@ import '../../features/settings/pages/phone_page.dart';
 import '../../features/settings/pages/edit_profile_page.dart';
 import '../../features/settings/pages/help_page.dart';
 import '../../features/settings/pages/about_page.dart';
+import '../../features/onboarding/privacy_policy_page.dart';
 import '../../features/onboarding/welcome_page.dart';
 import '../../features/onboarding/register.dart';
 import '../../features/onboarding/login.dart';
@@ -41,6 +42,7 @@ final appRouter = GoRouter(
   initialLocation: '/splash',
   routes: [
     GoRoute(path: '/splash', builder: (context, state) => const SplashPage()),
+    GoRoute(path: '/privacy-policy', builder: (context, state) => const PrivacyPolicyPage()),
     GoRoute(path: '/welcome', builder: (context, state) => const WelcomePage()),
     GoRoute(
       path: '/register',

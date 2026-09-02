@@ -61,6 +61,8 @@ class _VerifyingDevicePageState extends State<EnterDevicePage> {
                     _buildCodeField(),
                     const SizedBox(height: 24),
                     _buildInfoBox(),
+                    const SizedBox(height: 16),
+                    _buildOnlineWarningBox(),
                     const SizedBox(height: 32),
                     _buildConnectButton(),
                   ],
@@ -326,6 +328,51 @@ class _VerifyingDevicePageState extends State<EnterDevicePage> {
                 ),
                 Text(
                   'Kode perangkat dapat ditemukan pada label perangkat TAGANA.',
+                  style: TextStyle(
+                    color: AppColors.mutedForeground,
+                    fontSize: 11,
+                    height: 1.6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOnlineWarningBox() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.warning.withOpacity(0.5)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(Icons.wifi, size: 18, color: AppColors.warning),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Wajib Koneksi Internet',
+                  style: TextStyle(
+                    color: AppColors.warning,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Proses verifikasi ini harus online untuk memastikan kode perangkat valid dan belum diklaim oleh pengguna lain.',
                   style: TextStyle(
                     color: AppColors.mutedForeground,
                     fontSize: 11,

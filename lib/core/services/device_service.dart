@@ -47,8 +47,18 @@ class DeviceService {
 
       if (data == null || data['success'] != true) {
         print('[DeviceService] Pairing gagal dari response success=false');
+        final message = (data?['message'] as String?) ?? '';
+        
+        if (message.contains('sudah terpasang') || 
+            message.contains('terdaftar') || 
+            message.contains('dimiliki') ||
+            message.contains('terpakai')) {
+          print('[DeviceService] Device sudah memiliki pemilik, memeriksa kepemilikan (reconnect)...');
+          return _handleAlreadyPaired(deviceCode: deviceCode, currentUserId: user.id);
+        }
+
         return DeviceVerificationResult.failure(
-          (data?['message'] as String?) ?? 'Verifikasi perangkat gagal.',
+          message.isNotEmpty ? message : 'Verifikasi perangkat gagal.',
         );
       }
 
@@ -72,11 +82,16 @@ class DeviceService {
         message = body;
       }
 
-      // Kasus khusus: device sudah milik user yang sama (reconnect)
-      // Edge function mengembalikan 409 karena user_id != null.
+      // Kasus khusus: device sudah milik user yang sama (reconnect) atau user lain.
+      // Edge function mengembalikan error karena user_id != null.
       // Cek apakah user_id di DB sudah milik user yang login.
-      if (message != null && message.contains('sudah terpasang')) {
-        print('[DeviceService] Device sudah terpasang, memeriksa kepemilikan (reconnect)...');
+      if (message != null && (
+          message.contains('sudah terpasang') || 
+          message.contains('terdaftar') || 
+          message.contains('dimiliki') ||
+          message.contains('terpakai')
+      )) {
+        print('[DeviceService] Device sudah memiliki pemilik, memeriksa kepemilikan (reconnect)...');
         return _handleAlreadyPaired(deviceCode: deviceCode, currentUserId: user.id);
       }
 
@@ -145,8 +160,10 @@ class DeviceService {
           .maybeSingle();
 
       if (result == null) {
+        // Jika Edge Function bilang ini sudah terpasang (ada), tapi query ini 
+        // mengembalikan null, itu karena RLS memblokirnya (milik user lain).
         return const DeviceVerificationResult.failure(
-          'Kode perangkat tidak terdaftar.',
+          'Perangkat ini sudah terpasang pada akun lain.',
         );
       }
 
@@ -162,6 +179,7 @@ class DeviceService {
             firmware: (result['firmware_version'] as String?) ?? '-',
             region: '-',
           ),
+          alreadyOwned: true,
         );
       } else {
         // Benar-benar milik user lain

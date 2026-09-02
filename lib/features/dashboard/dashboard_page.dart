@@ -707,29 +707,37 @@ class _DashboardPageState extends State<DashboardPage> {
       batteryColor = AppColors.destructive;
     }
 
-    final isConnected = device.isConnected;
-    final statusLabel = switch (device.status) {
+    final isBleConnected = BleTelemetryService.instance.isConnected && 
+                           BleTelemetryService.instance.connectedDeviceId == device.id;
+
+    final isConnected = isBleConnected || device.isConnected;
+    
+    final statusLabel = isBleConnected ? 'Terhubung (BLE)' : switch (device.status) {
       'critical' => 'Kritis',
       'warning' => 'Peringatan',
-      'online' => 'Terhubung',
+      'online' => 'Normal',
       _ => 'Offline',
     };
-    final statusColor = switch (device.status) {
+    
+    final statusColor = isBleConnected ? Colors.blue.shade800 : switch (device.status) {
       'critical' => AppColors.destructive,
       'warning' => AppColors.warning,
       'online' => Colors.green.shade800,
       _ => AppColors.mutedForeground,
     };
-    final statusBg = switch (device.status) {
+    
+    final statusBg = isBleConnected ? Colors.blue.shade100 : switch (device.status) {
       'critical' => AppColors.destructive.withOpacity(0.12),
       'warning' => AppColors.warning.withOpacity(0.15),
       'online' => Colors.green.shade100,
       _ => AppColors.muted,
     };
 
-    final timeAgo = device.lastSeenAt != null
-        ? _formatTimeAgo(device.lastSeenAt!)
-        : 'Belum pernah terhubung';
+    final timeAgo = isBleConnected 
+        ? 'Realtime (BLE)' 
+        : (device.lastSeenAt != null
+            ? _formatTimeAgo(device.lastSeenAt!)
+            : 'Belum pernah terhubung');
 
     return InkWell(
       onTap: () => context.push('/device/${device.id}', extra: isConnected),

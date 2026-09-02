@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../auth/data/user_repository.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/widgets/app_version_footer.dart';
 
 class SplashPage extends StatefulWidget {
@@ -23,8 +24,15 @@ class _SplashPageState extends State<SplashPage> {
 
     if (!mounted) return;
 
-    final isLoggedIn = UserRepository.currentUser != null;
+    final prefs = await SharedPreferences.getInstance();
+    final hasAcceptedPrivacy = prefs.getBool('has_accepted_privacy') ?? false;
 
+    if (!hasAcceptedPrivacy) {
+      context.go('/privacy-policy');
+      return;
+    }
+
+    final isLoggedIn = UserRepository.currentUser != null;
     context.go(isLoggedIn ? '/dashboard' : '/login');
   }
 
@@ -43,9 +51,13 @@ class _SplashPageState extends State<SplashPage> {
                   const FlutterLogo(size: 120),
             ),
           ),
-          const Align(
-            alignment: Alignment.bottomCenter,
-            child: AppVersionFooter(),
+          const Positioned(
+            bottom: 24,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              child: AppVersionFooter(),
+            ),
           ),
         ],
       ),
