@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/services/device_alert_service.dart';
+import '../../../core/services/push_notification_service.dart';
 import '../../../core/supabase/supabase_client.dart';
 import '../models/user_profile.dart';
 
@@ -10,6 +12,16 @@ class UserRepository {
   static final _client = SupabaseClientService.client;
   static UserProfile? currentUser;
 
+  static Future<void> _saveFcmTokenInBackground() async {
+    try {
+      final token = await PushNotificationService.instance.getToken();
+      if (token == null || token.trim().isEmpty) return;
+      await updateFcmToken(token);
+    } catch (_) {
+      // no-op: token hanya disimpan jika user sudah login dan permission tersedia
+    }
+  }
+
   static Future<UserProfile> register({
     required String name,
     required String phone,
@@ -17,10 +29,7 @@ class UserRepository {
     try {
       final res = await _client.functions.invoke(
         'register-user',
-        body: {
-          'name': name.trim(),
-          'phone': phone.trim(),
-        },
+        body: {'name': name.trim(), 'phone': phone.trim()},
       );
 
       final data = res.data;
@@ -32,21 +41,20 @@ class UserRepository {
 
       final userProfile = UserProfile.fromJson(data['user']);
       currentUser = userProfile;
+
+      _saveFcmTokenInBackground();
+      DeviceAlertService.instance.startMonitoring();
       return userProfile;
     } catch (e) {
       throw Exception('Gagal mendaftar: $e');
     }
   }
 
-  static Future<UserProfile?> login({
-    required String phone,
-  }) async {
+  static Future<UserProfile?> login({required String phone}) async {
     try {
       final res = await _client.functions.invoke(
         'login-user',
-        body: {
-          'phone': phone.trim(),
-        },
+        body: {'phone': phone.trim()},
       );
 
       final data = res.data;
@@ -58,6 +66,11 @@ class UserRepository {
 
       final userProfile = UserProfile.fromJson(data['user']);
       currentUser = userProfile;
+
+      // Simpan FCM token setelah login berhasil
+      _saveFcmTokenInBackground();
+      DeviceAlertService.instance.startMonitoring();
+
       return userProfile;
     } catch (e) {
       return null;
@@ -74,10 +87,7 @@ class UserRepository {
       throw Exception('Data sesi tidak lengkap dari server.');
     }
 
-    await _client.auth.verifyOTP(
-      type: OtpType.magiclink,
-      tokenHash: tokenHash,
-    );
+    await _client.auth.verifyOTP(type: OtpType.magiclink, tokenHash: tokenHash);
   }
 
   /// Dipanggil saat app start untuk memulihkan profile dari session yang
@@ -93,7 +103,9 @@ class UserRepository {
     try {
       final result = await _client
           .from('user_profiles')
-          .select('id, name, phone, email, avatar_url, fcm_token, created_at, updated_at')
+          .select(
+            'id, name, phone, email, avatar_url, fcm_token, created_at, updated_at',
+          )
           .eq('id', session.user.id)
           .maybeSingle();
 
@@ -104,6 +116,8 @@ class UserRepository {
 
       final userProfile = UserProfile.fromJson(result);
       currentUser = userProfile;
+      _saveFcmTokenInBackground();
+      DeviceAlertService.instance.startMonitoring();
       return userProfile;
     } catch (_) {
       currentUser = null;
@@ -114,22 +128,25 @@ class UserRepository {
   static Future<void> logout() async {
     await _client.auth.signOut();
     currentUser = null;
+    await DeviceAlertService.instance.stopMonitoring();
   }
 
   static Future<String?> uploadAvatar(String filePath, String fileName) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Not authenticated');
 
-    final file = await _client.storage.from('avatars').upload(
+    final file = await _client.storage
+        .from('avatars')
+        .upload(
           '$userId/$fileName',
           File(filePath),
           fileOptions: const FileOptions(upsert: true),
         );
-    
+
     // get public url
     return _client.storage.from('avatars').getPublicUrl('$userId/$fileName');
   }
-  
+
   static Future<UserProfile> updateProfile({
     String? name,
     String? phone,
@@ -167,11 +184,18 @@ class UserRepository {
       return;
     }
 
+    final normalizedToken = token.trim();
+    if (normalizedToken.isEmpty) {
+      print('[FCM] Skipping token update — token empty');
+      return;
+    }
+
     try {
-      await _client
-          .from('user_profiles')
-          .update({'fcm_token': token, 'updated_at': DateTime.now().toIso8601String()})
-          .eq('id', userId);
+      await _client.from('user_profiles').upsert({
+        'id': userId,
+        'fcm_token': normalizedToken,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'id');
       print('[FCM] Token saved successfully for user $userId');
     } catch (e) {
       print('[FCM] Failed to save FCM token: $e');
