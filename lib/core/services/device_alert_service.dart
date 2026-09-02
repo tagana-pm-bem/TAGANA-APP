@@ -67,9 +67,9 @@ class DeviceAlertService {
       )
     ''');
 
-    final list = data as List? ?? const [];
-    return list
-        .map((item) => Map<String, dynamic>.from(item as Map))
+    final rawList = (data as List<dynamic>? ?? const <dynamic>[]);
+    return rawList
+        .map((item) => Map<String, dynamic>.from(item as Map<String, dynamic>))
         .toList();
   }
 
@@ -78,7 +78,7 @@ class DeviceAlertService {
       final currentUserId = SupabaseClientService.client.auth.currentUser?.id;
       if (currentUserId == null) return;
 
-      final data = await SupabaseClientService.client
+      final result = await SupabaseClientService.client
           .from('devices')
           .select('''
         id,
@@ -96,20 +96,33 @@ class DeviceAlertService {
           .eq('id', deviceId)
           .maybeSingle();
 
-      if (data == null) return;
-      final ownerId = data['user_id']?.toString();
+      if (result == null) return;
+
+      final ownerId = result['user_id']?.toString();
       if (ownerId == null || ownerId != currentUserId) return;
 
-      final statusList = data['device_status'];
-      final status = statusList is List && statusList.isNotEmpty
-          ? statusList.first as Map<String, dynamic>
-          : statusList is Map<String, dynamic>
-          ? statusList
-          : null;
+      final deviceStatusRaw = result['device_status'];
+      final Map<String, dynamic>? status = (() {
+        if (deviceStatusRaw is List && deviceStatusRaw.isNotEmpty) {
+          final firstItem = deviceStatusRaw.first;
+          if (firstItem is Map<String, dynamic>) {
+            return firstItem;
+          }
+          if (firstItem is Map) {
+            return Map<String, dynamic>.from(firstItem);
+          }
+        }
+        
+        if (deviceStatusRaw is Map) {
+          return Map<String, dynamic>.from(deviceStatusRaw);
+        }
+
+        return null;
+      })();
 
       if (status == null) return;
 
-      final deviceCode = (data['device_code'] ?? 'TAGANA').toString();
+      final deviceCode = (result['device_code'] ?? 'TAGANA').toString();
       final currentStatus = (status['status'] ?? '').toString().toLowerCase();
       final waterLevelRaw = status['water_level'];
       final waterLevel = waterLevelRaw is num ? waterLevelRaw.toDouble() : 0.0;

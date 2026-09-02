@@ -326,11 +326,7 @@ class _BluetoothConnectionPageState extends State<BluetoothConnectionPage>
   void _cancel() {
     FlutterBluePlus.stopScan();
     _selectedDevice?.device.disconnect();
-    if (context.canPop()) {
-      context.pop();
-    } else {
-      context.go('/enter-device');
-    }
+    context.go('/enter-device');
   }
 
   void _retry() {
@@ -350,13 +346,7 @@ class _BluetoothConnectionPageState extends State<BluetoothConnectionPage>
       body: SafeArea(
         child: Column(
           children: [
-            _Header(onBack: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/enter-device');
-              }
-            }),
+            _Header(onBack: () => context.go('/enter-device')),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),

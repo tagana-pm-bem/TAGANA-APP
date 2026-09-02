@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/services/device_alert_service.dart';
 import '../../../core/services/push_notification_service.dart';
@@ -41,7 +43,7 @@ class UserRepository {
 
       final userProfile = UserProfile.fromJson(data['user']);
       currentUser = userProfile;
-
+      await _cacheProfile(userProfile);
       _saveFcmTokenInBackground();
       DeviceAlertService.instance.startMonitoring();
       return userProfile;
@@ -66,6 +68,7 @@ class UserRepository {
 
       final userProfile = UserProfile.fromJson(data['user']);
       currentUser = userProfile;
+      await _cacheProfile(userProfile);
 
       // Simpan FCM token setelah login berhasil
       _saveFcmTokenInBackground();
@@ -116,19 +119,44 @@ class UserRepository {
 
       final userProfile = UserProfile.fromJson(result);
       currentUser = userProfile;
+      await _cacheProfile(userProfile);
       _saveFcmTokenInBackground();
       DeviceAlertService.instance.startMonitoring();
       return userProfile;
     } catch (_) {
-      currentUser = null;
-      return null;
+      // Jika offline, gagal mengambil dari server. Coba ambil dari local storage.
+      return await _loadCachedProfile();
     }
+  }
+
+  static Future<void> _cacheProfile(UserProfile profile) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cached_user_profile', jsonEncode(profile.toJson()));
+    } catch (_) {}
+  }
+
+  static Future<UserProfile?> _loadCachedProfile() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString('cached_user_profile');
+      if (str != null) {
+        final userProfile = UserProfile.fromJson(jsonDecode(str));
+        currentUser = userProfile;
+        return userProfile;
+      }
+    } catch (_) {}
+    currentUser = null;
+    return null;
   }
 
   static Future<void> logout() async {
     await _client.auth.signOut();
     currentUser = null;
     await DeviceAlertService.instance.stopMonitoring();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('cached_user_profile');
   }
 
   static Future<String?> uploadAvatar(String filePath, String fileName) async {
@@ -174,6 +202,7 @@ class UserRepository {
 
     final userProfile = UserProfile.fromJson(response);
     currentUser = userProfile;
+    await _cacheProfile(userProfile);
     return userProfile;
   }
 

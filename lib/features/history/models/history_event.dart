@@ -26,6 +26,34 @@ class HistoryEvent {
     this.deviceName,
   });
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'source': source.name,
+      'type': type,
+      'severity': severity,
+      'title': title,
+      'description': description,
+      'occurred_at': occurredAt.toIso8601String(),
+      'device_code': deviceCode,
+      'device_name': deviceName,
+    };
+  }
+
+  factory HistoryEvent.fromJson(Map<String, dynamic> json) {
+    return HistoryEvent(
+      id: json['id'] as String,
+      source: HistorySource.values.firstWhere((e) => e.name == json['source']),
+      type: json['type'] as String,
+      severity: json['severity'] as String?,
+      title: json['title'] as String,
+      description: json['description'] as String?,
+      occurredAt: DateTime.parse(json['occurred_at'] as String),
+      deviceCode: json['device_code'] as String?,
+      deviceName: json['device_name'] as String?,
+    );
+  }
+
   /// Kategori untuk filter tampilan: peringatan | kritis | perangkat | sistem
   String get category {
     if (source == HistorySource.alert) {
