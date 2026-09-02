@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -15,8 +17,9 @@ class DashboardService {
   /// milik user yang sedang login (auth.uid()), jadi tidak perlu filter
   /// user_id manual di sisi client.
   static Future<DashboardData> fetchDashboardData() async {
-    final devicesRaw = await _client
-        .from('devices')
+    try {
+      final devicesRaw = await _client
+          .from('devices')
         .select('''
           id,
           device_code,
@@ -32,9 +35,9 @@ class DashboardService {
             is_flood_detected,
             last_seen_at,
             updated_at
-          )
         ''')
-        .order('registered_at', ascending: false);
+        .order('registered_at', ascending: false)
+        .timeout(const Duration(seconds: 2));
 
     final devices = (devicesRaw as List)
         .map((e) => DeviceWithStatus.fromJson(e as Map<String, dynamic>))
@@ -60,14 +63,35 @@ class DashboardService {
           ''')
           .inFilter('device_id', deviceIds)
           .order('triggered_at', ascending: false)
-          .limit(10);
+          .limit(10)
+          .timeout(const Duration(seconds: 4));
 
       alerts = (alertsRaw as List)
           .map((e) => AlertSummary.fromJson(e as Map<String, dynamic>))
           .toList();
     }
 
-    return DashboardData(devices: devices, alerts: alerts);
+    final dashboardData = DashboardData(devices: devices, alerts: alerts);
+    
+    // Simpan ke cache lokal
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cached_dashboard_data', jsonEncode(dashboardData.toJson()));
+    } catch (_) {}
+
+    return dashboardData;
+    } catch (e) {
+      // Jika gagal fetch (misal tidak ada internet), coba baca dari cache
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final str = prefs.getString('cached_dashboard_data');
+        if (str != null) {
+          return DashboardData.fromJson(jsonDecode(str));
+        }
+      } catch (_) {}
+      
+      rethrow;
+    }
   }
 
   /// Subscribe ke perubahan `device_status` secara realtime. RLS untuk

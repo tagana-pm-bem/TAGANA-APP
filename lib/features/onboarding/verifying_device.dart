@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:tagana_app/core/theme/app_colors.dart';
 import '../../core/widgets/app_version_footer.dart';
 
@@ -23,20 +24,22 @@ class DeviceInfo {
 /// Hasil proses verifikasi perangkat: sukses (dengan [DeviceInfo]) atau gagal
 /// (dengan pesan error opsional).
 class DeviceVerificationResult {
-  const DeviceVerificationResult.success(this.device)
+  const DeviceVerificationResult.success(this.device, {this.alreadyOwned = false})
     : success = true,
       errorMessage = null;
 
   const DeviceVerificationResult.failure([this.errorMessage])
     : success = false,
+      alreadyOwned = false,
       device = null;
 
   final bool success;
+  final bool alreadyOwned;
   final DeviceInfo? device;
   final String? errorMessage;
 }
 
-enum _VerifyStatus { checking, success, error }
+enum _VerifyStatus { checking, success, error, alreadyOwned }
 
 class DeviceVerificationPage extends StatefulWidget {
   const DeviceVerificationPage({
@@ -91,7 +94,11 @@ class _DeviceVerificationPageState extends State<DeviceVerificationPage> {
     final result = await verify(widget.deviceCode);
     if (!mounted) return;
     setState(() {
-      _status = result.success ? _VerifyStatus.success : _VerifyStatus.error;
+      if (result.success) {
+        _status = result.alreadyOwned ? _VerifyStatus.alreadyOwned : _VerifyStatus.success;
+      } else {
+        _status = _VerifyStatus.error;
+      }
       _device = result.device;
       _errorMessage = result.errorMessage;
     });
@@ -138,6 +145,7 @@ class _DeviceVerificationPageState extends State<DeviceVerificationPage> {
                   _VerifyStatus.checking => _buildCheckingBody(),
                   _VerifyStatus.success => _buildSuccessBody(),
                   _VerifyStatus.error => _buildErrorBody(),
+                  _VerifyStatus.alreadyOwned => _buildAlreadyOwnedBody(),
                 },
               ),
             ),
@@ -163,7 +171,7 @@ class _DeviceVerificationPageState extends State<DeviceVerificationPage> {
               height: 36,
               child: IconButton(
                 padding: EdgeInsets.zero,
-                onPressed: () => Navigator.of(context).maybePop(),
+                onPressed: () => context.go('/enter-device'),
                 icon: Icon(
                   Icons.arrow_back,
                   size: 20,
@@ -222,7 +230,7 @@ class _DeviceVerificationPageState extends State<DeviceVerificationPage> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            'Mohon tunggu, sedang memeriksa kode dan koneksi ke perangkat TAGANA.',
+            'Sedang memastikan perangkat valid dan belum diklaim oleh pengguna lain melalui server TAGANA...',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppColors.mutedForeground,
@@ -280,7 +288,7 @@ class _DeviceVerificationPageState extends State<DeviceVerificationPage> {
           const SizedBox(height: 20),
           _buildChecklist(const [
             'Kode perangkat valid',
-            'Perangkat terdaftar di server',
+            'Perangkat tersedia (belum diklaim)',
             'Firmware kompatibel',
           ]),
           const SizedBox(height: 28),
@@ -445,10 +453,120 @@ class _DeviceVerificationPageState extends State<DeviceVerificationPage> {
   }
 
   // ---------------------------------------------------------------------
+  // Already Owned
+  // ---------------------------------------------------------------------
+
+  Widget _buildAlreadyOwnedBody() {
+    final device = _device;
+    return Column(
+      children: [
+        _buildStatusOrb(
+          background: AppColors.primaryContainer,
+          icon: Icons.info_outline,
+          iconColor: AppColors.primary,
+        ),
+        const SizedBox(height: 16),
+        _buildStatusBadge(
+          background: AppColors.primaryContainer,
+          textColor: AppColors.primary,
+          icon: Icons.devices,
+          label: 'Perangkat sudah dimiliki',
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Anda Sudah Memiliki Sensor Ini',
+          style: TextStyle(
+            color: AppColors.foreground,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Perangkat ini sudah terdaftar pada akun Anda. Anda bisa langsung masuk ke Dashboard atau menginput kode perangkat lain.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: AppColors.mutedForeground,
+            fontSize: 13,
+            height: 1.6,
+          ),
+        ),
+        const SizedBox(height: 24),
+        if (device != null) ...[
+          _buildDeviceInfoCard(device),
+          const SizedBox(height: 28),
+        ],
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () => context.go('/dashboard'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.primaryForeground,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              elevation: 0,
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Masuk Dashboard',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+                SizedBox(width: 8),
+                Icon(Icons.dashboard, size: 18),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: () => context.go('/enter-device'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              side: BorderSide(color: AppColors.border),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Kembali Input Kode',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+                SizedBox(width: 8),
+                Icon(Icons.tag, size: 18),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------
   // Error
   // ---------------------------------------------------------------------
 
   Widget _buildErrorBody() {
+    final isAlreadyClaimed = _errorMessage != null &&
+        (_errorMessage!.toLowerCase().contains('terpasang') ||
+         _errorMessage!.toLowerCase().contains('akun lain') ||
+         _errorMessage!.toLowerCase().contains('dimiliki') ||
+         _errorMessage!.toLowerCase().contains('terdaftar'));
+
+    final badgeLabel = isAlreadyClaimed ? 'Perangkat telah diklaim' : 'Perangkat tidak ditemukan';
+    final titleLabel = isAlreadyClaimed ? 'Milik Pengguna Lain' : 'Verifikasi Gagal';
+
     return Column(
       children: [
         _buildStatusOrb(
@@ -461,11 +579,11 @@ class _DeviceVerificationPageState extends State<DeviceVerificationPage> {
           background: AppColors.destructive,
           textColor: AppColors.destructiveForeground,
           icon: Icons.warning_amber_rounded,
-          label: 'Perangkat tidak ditemukan',
+          label: badgeLabel,
         ),
         const SizedBox(height: 16),
         Text(
-          'Verifikasi Gagal',
+          titleLabel,
           style: TextStyle(
             color: AppColors.foreground,
             fontSize: 20,
@@ -542,15 +660,15 @@ class _DeviceVerificationPageState extends State<DeviceVerificationPage> {
                 ),
               ),
               const SizedBox(height: 10),
-              _buildNumberedItem(1, 'Pastikan kode dimulai dengan "TGN_"'),
-              _buildNumberedItem(
-                2,
-                'Periksa label pada badan perangkat TAGANA',
-              ),
-              _buildNumberedItem(
-                3,
-                'Hubungi administrator jika masalah berlanjut',
-              ),
+              if (isAlreadyClaimed) ...[
+                _buildNumberedItem(1, 'Pastikan Anda memasukkan kode perangkat yang benar'),
+                _buildNumberedItem(2, 'Gunakan akun yang pertama kali mendaftarkan perangkat ini'),
+                _buildNumberedItem(3, 'Hubungi administrator untuk mereset kepemilikan perangkat'),
+              ] else ...[
+                _buildNumberedItem(1, 'Pastikan kode dimulai dengan "TGN_"'),
+                _buildNumberedItem(2, 'Periksa label pada badan perangkat TAGANA'),
+                _buildNumberedItem(3, 'Hubungi administrator jika masalah berlanjut'),
+              ],
             ],
           ),
         ),
@@ -558,7 +676,7 @@ class _DeviceVerificationPageState extends State<DeviceVerificationPage> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: _handleRetry,
+            onPressed: isAlreadyClaimed ? () => context.go('/enter-device') : _handleRetry,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: AppColors.primaryForeground,
@@ -568,15 +686,15 @@ class _DeviceVerificationPageState extends State<DeviceVerificationPage> {
               ),
               elevation: 0,
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'Coba Lagi',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  isAlreadyClaimed ? 'Kembali Input Kode' : 'Coba Lagi',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                 ),
-                SizedBox(width: 8),
-                Icon(Icons.refresh, size: 18),
+                const SizedBox(width: 8),
+                Icon(isAlreadyClaimed ? Icons.tag : Icons.refresh, size: 18),
               ],
             ),
           ),

@@ -63,6 +63,25 @@ class DeviceWithStatus {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'device_code': deviceCode,
+      'device_name': deviceName,
+      'firmware_version': firmwareVersion,
+      'is_active': isActive,
+      'registered_at': registeredAt.toIso8601String(),
+      'device_status': {
+        'status': status,
+        'water_level': waterLevel,
+        'battery_level': batteryLevel,
+        'signal_strength': signalStrength,
+        'is_flood_detected': isFloodDetected,
+        'last_seen_at': lastSeenAt?.toIso8601String(),
+      }
+    };
+  }
+
   static num? _parseNum(dynamic value) {
     if (value == null) return null;
     if (value is num) return value;
@@ -123,6 +142,23 @@ class AlertSummary {
       deviceName: deviceJson?['device_name'] as String?,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'type': type,
+      'severity': severity,
+      'status': status,
+      'value': value,
+      'threshold': threshold,
+      'message': message,
+      'triggered_at': triggeredAt.toIso8601String(),
+      'devices': {
+        'device_code': deviceCode,
+        'device_name': deviceName,
+      }
+    };
+  }
 }
 
 class DashboardData {
@@ -137,6 +173,23 @@ class DashboardData {
   bool get hasCriticalAlert =>
       alerts.any((a) => a.status == 'active' && a.severity == 'critical');
   String get systemCondition => hasCriticalAlert ? 'Kritis' : 'Stabil';
+
+  factory DashboardData.fromJson(Map<String, dynamic> json) {
+    final devicesRaw = json['devices'] as List? ?? [];
+    final alertsRaw = json['alerts'] as List? ?? [];
+
+    return DashboardData(
+      devices: devicesRaw.map((e) => DeviceWithStatus.fromJson(e as Map<String, dynamic>)).toList(),
+      alerts: alertsRaw.map((e) => AlertSummary.fromJson(e as Map<String, dynamic>)).toList(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'devices': devices.map((d) => d.toJson()).toList(),
+      'alerts': alerts.map((a) => a.toJson()).toList(),
+    };
+  }
 
   static const empty = DashboardData(devices: [], alerts: []);
 }

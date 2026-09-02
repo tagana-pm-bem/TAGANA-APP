@@ -62,6 +62,25 @@ class DeviceDetail {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'device_code': deviceCode,
+      'device_name': deviceName,
+      'firmware_version': firmwareVersion,
+      'is_active': isActive,
+      'registered_at': registeredAt.toIso8601String(),
+      'device_status': [{
+        'status': status,
+        'water_level': waterLevel,
+        'battery_level': batteryLevel,
+        'signal_strength': signalStrength,
+        'is_flood_detected': isFloodDetected,
+        'last_seen_at': lastSeenAt?.toIso8601String(),
+      }],
+    };
+  }
+
   static num? _parseNum(dynamic value) {
     if (value == null) return null;
     if (value is num) return value;
@@ -99,6 +118,15 @@ class DeviceLocationInfo {
       recordedAt: DateTime.parse(json['recorded_at'] as String),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'latitude': latitude,
+      'longitude': longitude,
+      'accuracy': accuracy,
+      'recorded_at': recordedAt.toIso8601String(),
+    };
+  }
 }
 
 class DeviceActivity {
@@ -125,6 +153,16 @@ class DeviceActivity {
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'type': type,
+      'title': title,
+      'description': description,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
 }
 
 class DeviceDetailData {
@@ -137,4 +175,20 @@ class DeviceDetailData {
     this.location,
     required this.activities,
   });
+
+  factory DeviceDetailData.fromJson(Map<String, dynamic> json) {
+    return DeviceDetailData(
+      device: DeviceDetail.fromJson(json['device'] as Map<String, dynamic>),
+      location: json['location'] != null ? DeviceLocationInfo.fromJson(json['location'] as Map<String, dynamic>) : null,
+      activities: (json['activities'] as List).map((e) => DeviceActivity.fromJson(e as Map<String, dynamic>)).toList(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'device': device.toJson(),
+      'location': location?.toJson(),
+      'activities': activities.map((e) => e.toJson()).toList(),
+    };
+  }
 }

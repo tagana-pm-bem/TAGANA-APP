@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:tagana_app/core/supabase/supabase_client.dart';
 import 'package:tagana_app/features/onboarding/verifying_device.dart';
@@ -47,8 +49,18 @@ class DeviceService {
 
       if (data == null || data['success'] != true) {
         print('[DeviceService] Pairing gagal dari response success=false');
+        final message = (data?['message'] as String?) ?? '';
+        
+        if (message.contains('sudah terpasang') || 
+            message.contains('terdaftar') || 
+            message.contains('dimiliki') ||
+            message.contains('terpakai')) {
+          print('[DeviceService] Device sudah memiliki pemilik, memeriksa kepemilikan (reconnect)...');
+          return _handleAlreadyPaired(deviceCode: deviceCode, currentUserId: user.id);
+        }
+
         return DeviceVerificationResult.failure(
-          (data?['message'] as String?) ?? 'Verifikasi perangkat gagal.',
+          message.isNotEmpty ? message : 'Verifikasi perangkat gagal.',
         );
       }
 
@@ -72,11 +84,16 @@ class DeviceService {
         message = body;
       }
 
-      // Kasus khusus: device sudah milik user yang sama (reconnect)
-      // Edge function mengembalikan 409 karena user_id != null.
+      // Kasus khusus: device sudah milik user yang sama (reconnect) atau user lain.
+      // Edge function mengembalikan error karena user_id != null.
       // Cek apakah user_id di DB sudah milik user yang login.
-      if (message != null && message.contains('sudah terpasang')) {
-        print('[DeviceService] Device sudah terpasang, memeriksa kepemilikan (reconnect)...');
+      if (message != null && (
+          message.contains('sudah terpasang') || 
+          message.contains('terdaftar') || 
+          message.contains('dimiliki') ||
+          message.contains('terpakai')
+      )) {
+        print('[DeviceService] Device sudah memiliki pemilik, memeriksa kepemilikan (reconnect)...');
         return _handleAlreadyPaired(deviceCode: deviceCode, currentUserId: user.id);
       }
 
@@ -145,8 +162,10 @@ class DeviceService {
           .maybeSingle();
 
       if (result == null) {
+        // Jika Edge Function bilang ini sudah terpasang (ada), tapi query ini 
+        // mengembalikan null, itu karena RLS memblokirnya (milik user lain).
         return const DeviceVerificationResult.failure(
-          'Kode perangkat tidak terdaftar.',
+          'Perangkat ini sudah terpasang pada akun lain.',
         );
       }
 
@@ -162,6 +181,7 @@ class DeviceService {
             firmware: (result['firmware_version'] as String?) ?? '-',
             region: '-',
           ),
+          alreadyOwned: true,
         );
       } else {
         // Benar-benar milik user lain
@@ -223,30 +243,50 @@ class DeviceService {
   /// RLS otomatis membatasi ke device milik auth.uid(), sama seperti di
   /// DashboardService.
   static Future<List<DeviceWithStatus>> fetchDevices() async {
-    final raw = await SupabaseClientService.client
-        .from('devices')
-        .select('''
-          id,
-          device_code,
-          device_name,
-          firmware_version,
-          is_active,
-          registered_at,
-          device_status (
-            status,
-            water_level,
-            battery_level,
-            signal_strength,
-            is_flood_detected,
-            last_seen_at,
-            updated_at
-          )
-        ''')
-        .order('registered_at', ascending: false);
+    try {
+      final raw = await SupabaseClientService.client
+          .from('devices')
+          .select('''
+            id,
+            device_code,
+            device_name,
+            firmware_version,
+            is_active,
+            registered_at,
+            device_status (
+              status,
+              water_level,
+              battery_level,
+              signal_strength,
+              is_flood_detected,
+              last_seen_at,
+              updated_at
+            )
+          ''')
+          .order('registered_at', ascending: false)
+          .timeout(const Duration(seconds: 2));
 
-    return (raw as List)
-        .map((e) => DeviceWithStatus.fromJson(e as Map<String, dynamic>))
-        .toList();
+      final devices = (raw as List)
+          .map((e) => DeviceWithStatus.fromJson(e as Map<String, dynamic>))
+          .toList();
+
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cached_devices', jsonEncode(devices.map((d) => d.toJson()).toList()));
+      } catch (_) {}
+
+      return devices;
+    } catch (e) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final str = prefs.getString('cached_devices');
+        if (str != null) {
+          final List<dynamic> data = jsonDecode(str);
+          return data.map((json) => DeviceWithStatus.fromJson(json as Map<String, dynamic>)).toList();
+        }
+      } catch (_) {}
+      rethrow;
+    }
   }
 
   /// Subscribe realtime ke perubahan device_status, khusus dipakai halaman
@@ -272,52 +312,102 @@ class DeviceService {
   /// terbaru + log aktivitas terbaru. RLS otomatis membatasi ke device
   /// milik auth.uid(), sama seperti fetchDevices().
   static Future<DeviceDetailData> fetchDeviceDetail(String deviceId) async {
-    final deviceRaw = await SupabaseClientService.client
-        .from('devices')
-        .select('''
-          id,
-          device_code,
-          device_name,
-          firmware_version,
-          is_active,
-          registered_at,
-          device_status (
-            status,
-            water_level,
-            battery_level,
-            signal_strength,
-            is_flood_detected,
-            last_seen_at,
-            updated_at
-          )
-        ''')
-        .eq('id', deviceId)
-        .single();
+    try {
+      final deviceRaw = await SupabaseClientService.client
+          .from('devices')
+          .select('''
+            id,
+            device_code,
+            device_name,
+            firmware_version,
+            is_active,
+            registered_at,
+            device_status (
+              status,
+              water_level,
+              battery_level,
+              signal_strength,
+              is_flood_detected,
+              last_seen_at,
+              updated_at
+            )
+          ''')
+          .eq('id', deviceId)
+          .single()
+          .timeout(const Duration(seconds: 4));
 
-    final locationRaw = await SupabaseClientService.client
-        .from('device_locations')
-        .select('latitude, longitude, accuracy, recorded_at')
-        .eq('device_id', deviceId)
-        .order('recorded_at', ascending: false)
-        .limit(1)
-        .maybeSingle();
+      final locationRaw = await SupabaseClientService.client
+          .from('device_locations')
+          .select('latitude, longitude, accuracy, recorded_at')
+          .eq('device_id', deviceId)
+          .order('recorded_at', ascending: false)
+          .limit(1)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 4));
 
-    final activitiesRaw = await SupabaseClientService.client
-        .from('device_activities')
-        .select('id, type, title, description, created_at')
-        .eq('device_id', deviceId)
-        .order('created_at', ascending: false)
-        .limit(10);
+      final activitiesRaw = await SupabaseClientService.client
+          .from('device_activities')
+          .select('id, type, title, description, created_at')
+          .eq('device_id', deviceId)
+          .order('created_at', ascending: false)
+          .limit(10)
+          .timeout(const Duration(seconds: 4));
 
-    return DeviceDetailData(
-      device: DeviceDetail.fromJson(deviceRaw),
-      location: locationRaw != null
-          ? DeviceLocationInfo.fromJson(locationRaw)
-          : null,
-      activities: (activitiesRaw as List)
-          .map((e) => DeviceActivity.fromJson(e as Map<String, dynamic>))
-          .toList(),
-    );
+      final data = DeviceDetailData(
+        device: DeviceDetail.fromJson(deviceRaw),
+        location: locationRaw != null
+            ? DeviceLocationInfo.fromJson(locationRaw)
+            : null,
+        activities: (activitiesRaw as List)
+            .map((e) => DeviceActivity.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cached_device_detail_$deviceId', jsonEncode(data.toJson()));
+      } catch (_) {}
+
+      return data;
+    } catch (e) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final str = prefs.getString('cached_device_detail_$deviceId');
+        if (str != null) {
+          return DeviceDetailData.fromJson(jsonDecode(str));
+        } else {
+          // Fallback sekunder: Coba cari data dasar perangkat dari cache daftar perangkat
+          final listStr = prefs.getString('cached_devices');
+          if (listStr != null) {
+            final List<dynamic> data = jsonDecode(listStr);
+            final devices = data.map((json) => DeviceWithStatus.fromJson(json as Map<String, dynamic>)).toList();
+            final fallbackDevice = devices.firstWhere((d) => d.id == deviceId);
+            
+            return DeviceDetailData(
+              device: DeviceDetail(
+                id: fallbackDevice.id,
+                deviceCode: fallbackDevice.deviceCode,
+                deviceName: fallbackDevice.deviceName,
+                firmwareVersion: fallbackDevice.firmwareVersion,
+                isActive: fallbackDevice.isActive,
+                registeredAt: fallbackDevice.registeredAt,
+                status: fallbackDevice.status,
+                waterLevel: fallbackDevice.waterLevel,
+                batteryLevel: fallbackDevice.batteryLevel,
+                signalStrength: fallbackDevice.signalStrength,
+                isFloodDetected: fallbackDevice.isFloodDetected,
+                lastSeenAt: fallbackDevice.lastSeenAt,
+              ),
+              location: null,
+              activities: [],
+            );
+          }
+        }
+      } catch (parseErr) {
+        print('CACHE OFFLINE ERROR: $parseErr');
+      }
+      rethrow;
+    }
   }
 
   /// Subscribe realtime khusus satu perangkat: status, lokasi, dan
