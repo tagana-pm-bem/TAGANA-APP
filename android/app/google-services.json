@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "697063451310",
+    "project_id": "tagana-app-7ea2e",
+    "storage_bucket": "tagana-app-7ea2e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:697063451310:android:62a425f6df2fb590ef5b3f",
+        "android_client_info": {
+          "package_name": "com.example.tagana_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBxbvmkNW-1oxLMDyUaoSQDetfL4dl94mc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
