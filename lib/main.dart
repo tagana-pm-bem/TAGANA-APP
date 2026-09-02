@@ -21,10 +21,16 @@ Future<void> main() async {
   };
 
   if (UserRepository.currentUser != null) {
+    // Langsung coba ambil token
     final token = await PushNotificationService.instance.getToken();
     if (token != null) {
-      UserRepository.updateFcmToken(token);
+      await UserRepository.updateFcmToken(token);
     }
+
+    // Listener untuk token refresh (token baru saat rotasi kunci FCM, dll)
+    PushNotificationService.instance.onTokenRefresh((newToken) {
+      UserRepository.updateFcmToken(newToken);
+    });
   }
 
   runApp(const ProviderScope(child: TaganaApp()));

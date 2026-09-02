@@ -93,7 +93,7 @@ class UserRepository {
     try {
       final result = await _client
           .from('user_profiles')
-          .select('id, name, phone, email, avatar_url, created_at, updated_at')
+          .select('id, name, phone, email, avatar_url, fcm_token, created_at, updated_at')
           .eq('id', session.user.id)
           .maybeSingle();
 
@@ -162,16 +162,19 @@ class UserRepository {
 
   static Future<void> updateFcmToken(String token) async {
     final userId = _client.auth.currentUser?.id;
-    if (userId == null) return;
-    
+    if (userId == null) {
+      print('[FCM] Skipping token update — user not logged in');
+      return;
+    }
+
     try {
-      // Perlu ditambah fcm_token di schema database (tabel user_profiles)
       await _client
           .from('user_profiles')
-          .update({'fcm_token': token})
+          .update({'fcm_token': token, 'updated_at': DateTime.now().toIso8601String()})
           .eq('id', userId);
+      print('[FCM] Token saved successfully for user $userId');
     } catch (e) {
-      print('Failed to save FCM token: $e');
+      print('[FCM] Failed to save FCM token: $e');
     }
   }
 }

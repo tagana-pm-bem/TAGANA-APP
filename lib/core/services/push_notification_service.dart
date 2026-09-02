@@ -15,7 +15,7 @@ class PushNotificationService {
   static PushNotificationService get instance => _instance;
   PushNotificationService._internal();
 
-  final FirebaseMessaging _fcm = FirebaseMessaging.instance;
+  FirebaseMessaging get _fcm => FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
 
   bool _isInitialized = false;
@@ -82,11 +82,17 @@ class PushNotificationService {
 
   Future<String?> getToken() async {
     try {
-      return await _fcm.getToken();
+      final token = await _fcm.getToken();
+      print('[FCM] Token: $token');
+      return token;
     } catch (e) {
-      print('Error getting FCM token: ');
+      print('[FCM] Error getting token: $e');
       return null;
     }
+  }
+
+  void onTokenRefresh(void Function(String token) callback) {
+    _fcm.onTokenRefresh.listen(callback);
   }
 
   Future<void> _showLocalNotification(RemoteMessage message) async {
