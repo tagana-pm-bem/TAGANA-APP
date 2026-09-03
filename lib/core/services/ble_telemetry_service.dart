@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'device_service.dart'; // Import service untuk mencatat log aktivitas
+import 'local_offline_detection_service.dart';
 
 class BleTelemetryService {
   BleTelemetryService._();
@@ -14,7 +15,7 @@ class BleTelemetryService {
   BluetoothCharacteristic? _rxCharacteristic;
   StreamSubscription<List<int>>? _notifySubscription;
   StreamSubscription<BluetoothConnectionState>? _connectionSubscription;
-  
+
   String? _connectedDeviceCode;
   String? _connectedDeviceId; // Menyimpan UUID device untuk log ketika terputus
 
@@ -30,10 +31,14 @@ class BleTelemetryService {
   bool get isConnected => _device != null && isConnectedNotifier.value;
   String? get connectedDeviceCode => _connectedDeviceCode;
   String? get connectedDeviceId => _connectedDeviceId;
-  
+
   BluetoothDevice? connectedDevice;
 
-  Future<void> connectToDevice(BluetoothDevice device, {String? deviceId, String? deviceCode}) async {
+  Future<void> connectToDevice(
+    BluetoothDevice device, {
+    String? deviceId,
+    String? deviceCode,
+  }) async {
     try {
       _device = device;
       // Lakukan koneksi BLE dengan timeout
@@ -51,7 +56,8 @@ class BleTelemetryService {
           deviceId: _connectedDeviceId!,
           type: 'ble_connected',
           title: 'Koneksi BLE Aktif',
-          description: 'Aplikasi berhasil terhubung ke perangkat secara langsung via Bluetooth.',
+          description:
+              'Aplikasi berhasil terhubung ke perangkat secara langsung via Bluetooth.',
         );
       }
 
@@ -77,7 +83,8 @@ class BleTelemetryService {
       BluetoothService? targetService;
 
       for (var s in services) {
-        if (s.uuid.str.toLowerCase() == '4fafc201-1fb5-459e-8fcc-c5c9c331914b') {
+        if (s.uuid.str.toLowerCase() ==
+            '4fafc201-1fb5-459e-8fcc-c5c9c331914b') {
           targetService = s;
           break;
         }
@@ -88,9 +95,11 @@ class BleTelemetryService {
       }
 
       for (var c in targetService.characteristics) {
-        if (c.uuid.str.toLowerCase() == 'beb5483e-36e1-4688-b7f5-ea07361b26a9') {
+        if (c.uuid.str.toLowerCase() ==
+            'beb5483e-36e1-4688-b7f5-ea07361b26a9') {
           _txCharacteristic = c;
-        } else if (c.uuid.str.toLowerCase() == 'beb5483e-36e1-4688-b7f5-ea07361b26a8') { 
+        } else if (c.uuid.str.toLowerCase() ==
+            'beb5483e-36e1-4688-b7f5-ea07361b26a8') {
           _rxCharacteristic = c;
         }
       }
@@ -115,16 +124,27 @@ class BleTelemetryService {
             if (_buffer.trim().endsWith('}')) {
               final data = jsonDecode(_buffer) as Map<String, dynamic>;
               _telemetryController.add(data);
+
+              // Record device online for local offline detection
+              if (_connectedDeviceId != null) {
+                LocalOfflineDetectionService.instance.recordDeviceOnline(
+                  _connectedDeviceId!,
+                );
+              }
+
               _buffer = ''; // Reset buffer setelah berhasil decode
             }
           } catch (e) {
             // Abaikan error sebagian, buffer akan menampung chunk selanjutnya
-            if (_buffer.length > 2048) _buffer = ''; // Mencegah memory leak jika JSON rusak parah
+            if (_buffer.length > 2048)
+              _buffer = ''; // Mencegah memory leak jika JSON rusak parah
           }
         }
       });
 
-      print('[BLE] Berhasil terhubung dan mendengarkan data via connectToDevice.');
+      print(
+        '[BLE] Berhasil terhubung dan mendengarkan data via connectToDevice.',
+      );
     } catch (e) {
       await disconnect();
       rethrow;
@@ -227,7 +247,8 @@ class BleTelemetryService {
       BluetoothService? targetService;
 
       for (var s in services) {
-        if (s.uuid.str.toLowerCase() == '4fafc201-1fb5-459e-8fcc-c5c9c331914b') {
+        if (s.uuid.str.toLowerCase() ==
+            '4fafc201-1fb5-459e-8fcc-c5c9c331914b') {
           targetService = s;
           break;
         }
@@ -238,9 +259,11 @@ class BleTelemetryService {
       }
 
       for (var c in targetService.characteristics) {
-        if (c.uuid.str.toLowerCase() == 'beb5483e-36e1-4688-b7f5-ea07361b26a8') {
+        if (c.uuid.str.toLowerCase() ==
+            'beb5483e-36e1-4688-b7f5-ea07361b26a8') {
           _txCharacteristic = c;
-        } else if (c.uuid.str.toLowerCase() == 'beb5483e-36e1-4688-b7f5-ea07361b26a8') {
+        } else if (c.uuid.str.toLowerCase() ==
+            'beb5483e-36e1-4688-b7f5-ea07361b26a8') {
           _rxCharacteristic = c;
         }
       }
@@ -255,7 +278,7 @@ class BleTelemetryService {
       print('[BLE] Mengaktifkan Notifikasi Realtime...');
       await _txCharacteristic!.setNotifyValue(true);
       isConnectedNotifier.value = true;
-      
+
       _connectedDeviceCode = deviceCode;
       _connectedDeviceId = deviceId; // Simpan UUID
 
@@ -265,7 +288,8 @@ class BleTelemetryService {
           deviceId: _connectedDeviceId!,
           type: 'ble_connected',
           title: 'Koneksi BLE Aktif',
-          description: 'Berhasil terhubung ke perangkat $deviceCode via Bluetooth.',
+          description:
+              'Berhasil terhubung ke perangkat $deviceCode via Bluetooth.',
         );
       }
 
@@ -277,6 +301,14 @@ class BleTelemetryService {
             if (_buffer2.trim().endsWith('}')) {
               final data = jsonDecode(_buffer2) as Map<String, dynamic>;
               _telemetryController.add(data);
+
+              // Record device online for local offline detection
+              if (_connectedDeviceId != null) {
+                LocalOfflineDetectionService.instance.recordDeviceOnline(
+                  _connectedDeviceId!,
+                );
+              }
+
               _buffer2 = '';
             }
           } catch (e) {
@@ -299,7 +331,9 @@ class BleTelemetryService {
 
   Future<void> sendRawCommand(String command) async {
     if (_rxCharacteristic == null) {
-      throw Exception('Karakteristik RX belum siap atau perangkat tidak mendukung penerimaan perintah.');
+      throw Exception(
+        'Karakteristik RX belum siap atau perangkat tidak mendukung penerimaan perintah.',
+      );
     }
     final bytes = utf8.encode(command);
 
@@ -309,7 +343,9 @@ class BleTelemetryService {
           .timeout(const Duration(seconds: 2));
       print('[BLE] Command terkirim: $command');
     } catch (e) {
-      print('[BLE] Info: Write timeout atau error (mungkin ESP32 sedang restart): $e');
+      print(
+        '[BLE] Info: Write timeout atau error (mungkin ESP32 sedang restart): $e',
+      );
     }
   }
 
@@ -334,7 +370,7 @@ class BleTelemetryService {
         } catch (_) {}
       }
     }
-    
+
     // Log terputusnya BLE
     if (isDisconnectedEvent && _connectedDeviceId != null) {
       DeviceService.logActivity(

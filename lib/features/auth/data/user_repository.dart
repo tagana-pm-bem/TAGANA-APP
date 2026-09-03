@@ -5,6 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/services/device_alert_service.dart';
 import '../../../core/services/push_notification_service.dart';
+import '../../../core/services/local_offline_detection_service.dart';
+import '../../../core/services/connectivity_service.dart';
+import '../../../core/services/error_handler_service.dart';
 import '../../../core/supabase/supabase_client.dart';
 import '../models/user_profile.dart';
 
@@ -48,7 +51,11 @@ class UserRepository {
       DeviceAlertService.instance.startMonitoring();
       return userProfile;
     } catch (e) {
-      throw Exception('Gagal mendaftar: $e');
+      await ErrorHandlerService.instance.handleDatabaseError(
+        e,
+        operation: 'Register',
+      );
+      rethrow;
     }
   }
 
@@ -75,6 +82,12 @@ class UserRepository {
       DeviceAlertService.instance.startMonitoring();
 
       return userProfile;
+    } on Exception catch (e) {
+      await ErrorHandlerService.instance.handleDatabaseError(
+        e,
+        operation: 'Login',
+      );
+      return null;
     } catch (e) {
       return null;
     }
@@ -123,8 +136,9 @@ class UserRepository {
       _saveFcmTokenInBackground();
       DeviceAlertService.instance.startMonitoring();
       return userProfile;
-    } catch (_) {
+    } catch (e) {
       // Jika offline, gagal mengambil dari server. Coba ambil dari local storage.
+      // Jangan tampilkan error ke user di sini, karena mereka mungkin offline
       return await _loadCachedProfile();
     }
   }
@@ -132,7 +146,10 @@ class UserRepository {
   static Future<void> _cacheProfile(UserProfile profile) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('cached_user_profile', jsonEncode(profile.toJson()));
+      await prefs.setString(
+        'cached_user_profile',
+        jsonEncode(profile.toJson()),
+      );
     } catch (_) {}
   }
 
@@ -154,25 +171,35 @@ class UserRepository {
     await _client.auth.signOut();
     currentUser = null;
     await DeviceAlertService.instance.stopMonitoring();
+    await LocalOfflineDetectionService.instance.stopMonitoring();
+    await ConnectivityService.instance.stopMonitoring();
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('cached_user_profile');
   }
 
   static Future<String?> uploadAvatar(String filePath, String fileName) async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) throw Exception('Not authenticated');
+    try {
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) throw Exception('Not authenticated');
 
-    final file = await _client.storage
-        .from('avatars')
-        .upload(
-          '$userId/$fileName',
-          File(filePath),
-          fileOptions: const FileOptions(upsert: true),
-        );
+      final file = await _client.storage
+          .from('avatars')
+          .upload(
+            '$userId/$fileName',
+            File(filePath),
+            fileOptions: const FileOptions(upsert: true),
+          );
 
-    // get public url
-    return _client.storage.from('avatars').getPublicUrl('$userId/$fileName');
+      // get public url
+      return _client.storage.from('avatars').getPublicUrl('$userId/$fileName');
+    } catch (e) {
+      await ErrorHandlerService.instance.handleDatabaseError(
+        e,
+        operation: 'Upload Avatar',
+      );
+      return null;
+    }
   }
 
   static Future<UserProfile> updateProfile({
@@ -181,29 +208,37 @@ class UserRepository {
     String? email,
     String? avatarUrl,
   }) async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) throw Exception('Not authenticated');
+    try {
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) throw Exception('Not authenticated');
 
-    final updates = <String, dynamic>{
-      'updated_at': DateTime.now().toIso8601String(),
-    };
+      final updates = <String, dynamic>{
+        'updated_at': DateTime.now().toIso8601String(),
+      };
 
-    if (name != null) updates['name'] = name;
-    if (phone != null) updates['phone'] = phone;
-    if (email != null) updates['email'] = email;
-    if (avatarUrl != null) updates['avatar_url'] = avatarUrl;
+      if (name != null) updates['name'] = name;
+      if (phone != null) updates['phone'] = phone;
+      if (email != null) updates['email'] = email;
+      if (avatarUrl != null) updates['avatar_url'] = avatarUrl;
 
-    final response = await _client
-        .from('user_profiles')
-        .update(updates)
-        .eq('id', userId)
-        .select()
-        .single();
+      final response = await _client
+          .from('user_profiles')
+          .update(updates)
+          .eq('id', userId)
+          .select()
+          .single();
 
-    final userProfile = UserProfile.fromJson(response);
-    currentUser = userProfile;
-    await _cacheProfile(userProfile);
-    return userProfile;
+      final userProfile = UserProfile.fromJson(response);
+      currentUser = userProfile;
+      await _cacheProfile(userProfile);
+      return userProfile;
+    } catch (e) {
+      await ErrorHandlerService.instance.handleDatabaseError(
+        e,
+        operation: 'Update Profile',
+      );
+      rethrow;
+    }
   }
 
   static Future<void> updateFcmToken(String token) async {
@@ -219,15 +254,34 @@ class UserRepository {
       return;
     }
 
-    try {
-      await _client.from('user_profiles').upsert({
-        'id': userId,
-        'fcm_token': normalizedToken,
-        'updated_at': DateTime.now().toIso8601String(),
-      }, onConflict: 'id');
-      print('[FCM] Token saved successfully for user $userId');
-    } catch (e) {
-      print('[FCM] Failed to save FCM token: $e');
+    // Retry with exponential backoff for transient failures.
+    const int maxAttempts = 4;
+    int attempt = 0;
+    int delayMs = 500;
+
+    while (attempt < maxAttempts) {
+      try {
+        await _client.from('user_profiles').upsert({
+          'id': userId,
+          'fcm_token': normalizedToken,
+          'updated_at': DateTime.now().toIso8601String(),
+        }, onConflict: 'id');
+        print('[FCM] Token saved successfully for user $userId');
+        return;
+      } catch (e) {
+        attempt++;
+        print('[FCM] Failed to save FCM token (attempt $attempt): $e');
+        if (attempt >= maxAttempts) {
+          print('[FCM] Giving up after $attempt attempts');
+          await ErrorHandlerService.instance.handleDatabaseError(
+            e,
+            operation: 'Save FCM Token',
+          );
+          return;
+        }
+        await Future.delayed(Duration(milliseconds: delayMs));
+        delayMs *= 2;
+      }
     }
   }
 }

@@ -85,6 +85,16 @@ class PushNotificationService {
   }
 
   Future<String?> getToken() async {
+    // Ensure service initialized before requesting token.
+    if (!_isInitialized) {
+      try {
+        await init();
+      } catch (e) {
+        print('[FCM] Failed to initialize before getToken: $e');
+        return null;
+      }
+    }
+
     try {
       final token = await _fcm.getToken();
       print('[FCM] Token: $token');

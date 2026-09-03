@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'core/navigation/app_back_handler.dart';
 import 'core/navigation/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/connectivity_banner.dart';
+import 'core/services/error_handler_service.dart';
 
 class TaganaApp extends StatelessWidget {
   const TaganaApp({super.key});
@@ -16,11 +18,16 @@ class TaganaApp extends StatelessWidget {
       theme: AppTheme.light,
       routerConfig: appRouter,
       builder: (context, child) {
-        return AppBackHandler(
-          canPop: appRouter.canPop,
-          onPop: appRouter.pop,
-          onExit: SystemNavigator.pop,
-          child: child ?? const SizedBox.shrink(),
+        // Setup error handler context
+        ErrorHandlerService.instance.setContext(context);
+
+        return ConnectivityBanner(
+          child: AppBackHandler(
+            canPop: appRouter.canPop,
+            onPop: appRouter.pop,
+            onExit: SystemNavigator.pop,
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
     );
