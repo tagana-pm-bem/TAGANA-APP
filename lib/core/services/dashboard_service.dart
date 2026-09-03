@@ -35,6 +35,7 @@ class DashboardService {
             is_flood_detected,
             last_seen_at,
             updated_at
+          )
         ''')
         .order('registered_at', ascending: false)
         .timeout(const Duration(seconds: 2));
