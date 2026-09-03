@@ -11,12 +11,14 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 class PushNotificationService {
-  static final PushNotificationService _instance = PushNotificationService._internal();
+  static final PushNotificationService _instance =
+      PushNotificationService._internal();
   static PushNotificationService get instance => _instance;
   PushNotificationService._internal();
 
   FirebaseMessaging get _fcm => FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
 
   bool _isInitialized = false;
   Function(String payload)? onNotificationClick;
@@ -44,10 +46,9 @@ class PushNotificationService {
 
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
-    
-    const InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-    );
+
+    const InitializationSettings initializationSettings =
+        InitializationSettings(android: initializationSettingsAndroid);
 
     await _localNotifications.initialize(
       settings: initializationSettings,
@@ -67,10 +68,13 @@ class PushNotificationService {
         onNotificationClick!(jsonEncode(message.data));
       }
     });
-    
+
     // Check if app was opened from a terminated state
-    RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
-    if (initialMessage != null && initialMessage.data.isNotEmpty && onNotificationClick != null) {
+    RemoteMessage? initialMessage = await FirebaseMessaging.instance
+        .getInitialMessage();
+    if (initialMessage != null &&
+        initialMessage.data.isNotEmpty &&
+        onNotificationClick != null) {
       // Need a slight delay to ensure router is ready
       Future.delayed(const Duration(milliseconds: 500), () {
         onNotificationClick!(jsonEncode(initialMessage.data));
@@ -95,27 +99,43 @@ class PushNotificationService {
     _fcm.onTokenRefresh.listen(callback);
   }
 
+  Future<void> showLocalNotification({
+    required String title,
+    required String body,
+    String? payload,
+    int id = 0,
+  }) async {
+    final notificationId = id == 0
+        ? DateTime.now().millisecondsSinceEpoch ~/ 1000
+        : id;
+    await _localNotifications.show(
+      id: notificationId,
+      title: title,
+      body: body,
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'high_importance_channel',
+          'High Importance Notifications',
+          channelDescription: 'Notifikasi penting TAGANA.',
+          importance: Importance.max,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+        ),
+      ),
+      payload: payload ?? '{}',
+    );
+  }
+
   Future<void> _showLocalNotification(RemoteMessage message) async {
     RemoteNotification? notification = message.notification;
     AndroidNotification? android = message.notification?.android;
 
     if (notification != null && android != null) {
-      await _localNotifications.show(
-        id: notification.hashCode,
-        title: notification.title,
-        body: notification.body,
-        notificationDetails: const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'high_importance_channel',
-            'High Importance Notifications',
-            channelDescription: 'This channel is used for important notifications.',
-            importance: Importance.max,
-            priority: Priority.high,
-          ),
-        ),
+      await showLocalNotification(
+        title: notification.title ?? 'TAGANA',
+        body: notification.body ?? 'Ada notifikasi baru',
         payload: jsonEncode(message.data),
       );
     }
   }
 }
-
