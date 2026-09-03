@@ -922,7 +922,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
 
         _buildEmergencyBtn(context),
         const SizedBox(height: AppSpacing.sm),
-        _buildTestConnectionBtn(context),
+        // _buildTestConnectionBtn(context),
       ],
     );
   }
@@ -979,17 +979,17 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
     );
   }
 
-  Widget _buildTestConnectionBtn(BuildContext context) {
-    return ElevatedButton.icon(
-      onPressed: () => context.push('/device/${widget.deviceId}/test-connection'),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.primaryForeground,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      icon: const Icon(LucideIcons.radio, size: 18),
-      label: const Text('Uji Koneksi', style: TextStyle(fontWeight: FontWeight.bold)),
-    );
-  }
+  // Widget _buildTestConnectionBtn(BuildContext context) {
+  //   return ElevatedButton.icon(
+  //     onPressed: () => context.push('/device/${widget.deviceId}/test-connection'),
+  //     style: ElevatedButton.styleFrom(
+  //       backgroundColor: AppColors.primary,
+  //       foregroundColor: AppColors.primaryForeground,
+  //       padding: const EdgeInsets.symmetric(vertical: 16),
+  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  //     ),
+  //     icon: const Icon(LucideIcons.radio, size: 18),
+  //     label: const Text('Uji Koneksi', style: TextStyle(fontWeight: FontWeight.bold)),
+  //   );
+  // }
 }
